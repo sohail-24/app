@@ -1,4 +1,5 @@
 import { trpc } from "@/providers/trpc";
+import { formatCurrency } from "@/lib/i18n";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
@@ -6,7 +7,7 @@ import {
   TrendingUp,
   ShoppingCart,
   Package,
-  DollarSign,
+  IndianRupee,
   ArrowDownRight,
 } from "lucide-react";
 
@@ -42,7 +43,7 @@ export default function Reports() {
         {[
           {
             title: "Cart Value",
-            value: `$${cartTotal.toFixed(2)}`,
+            value: formatCurrency(cartTotal),
             description: "Items in cart",
             icon: ShoppingCart,
             trend: null,
@@ -56,9 +57,9 @@ export default function Reports() {
           },
           {
             title: "Order Value",
-            value: `$${orderTotal.toFixed(2)}`,
+            value: formatCurrency(orderTotal),
             description: "Recent order total",
-            icon: DollarSign,
+            icon: IndianRupee,
             trend: null,
           },
           {
@@ -160,7 +161,7 @@ export default function Reports() {
         <Card>
           <CardHeader>
             <CardTitle className="text-base flex items-center gap-2">
-              <DollarSign className="h-4 w-4" />
+              <IndianRupee className="h-4 w-4" />
               Recent Order Values
             </CardTitle>
             <CardDescription>Last 10 order amounts</CardDescription>
@@ -189,7 +190,7 @@ export default function Reports() {
                       </div>
                     </div>
                     <span className="font-semibold text-sm">
-                      ${parseFloat(order.totalAmount?.toString() ?? "0").toFixed(2)}
+                      {formatCurrency(order.totalAmount)}
                     </span>
                   </div>
                 ))}

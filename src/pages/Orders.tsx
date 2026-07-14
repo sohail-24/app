@@ -1,5 +1,6 @@
 import { Link } from "react-router";
 import { trpc } from "@/providers/trpc";
+import { formatCurrency } from "@/lib/i18n";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -108,7 +109,7 @@ export default function Orders() {
                     <div className="flex items-center gap-4">
                       <div className="text-right">
                         <p className="font-semibold text-sm">
-                          ${parseFloat(order.totalAmount?.toString() ?? "0").toFixed(2)}
+                          {formatCurrency(order.totalAmount)}
                         </p>
                         <p className={`text-xs capitalize ${paymentColors[order.paymentStatus] ?? ""}`}>
                           {order.paymentStatus?.replace("_", " ")}

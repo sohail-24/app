@@ -1,5 +1,6 @@
 import { useParams, Link, useNavigate } from "react-router";
 import { trpc } from "@/providers/trpc";
+import { formatCurrency } from "@/lib/i18n";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -12,7 +13,7 @@ import {
   Truck,
   Calendar,
   MapPin,
-  DollarSign,
+  IndianRupee,
   Loader2,
 } from "lucide-react";
 
@@ -200,11 +201,11 @@ export default function OrderDetail() {
                 <div className="flex-1 min-w-0">
                   <p className="font-medium text-sm">{item.productName}</p>
                   <p className="text-xs text-muted-foreground">
-                    {item.quantity} x ${unitPrice.toFixed(2)} / {item.unitType}
+                    {item.quantity} x {formatCurrency(unitPrice)} / {item.unitType}
                   </p>
                 </div>
                 <span className="font-semibold text-sm">
-                  ${totalPrice.toFixed(2)}
+                  {formatCurrency(totalPrice)}
                 </span>
               </div>
             );
@@ -262,28 +263,28 @@ export default function OrderDetail() {
       <Card>
         <CardHeader>
           <CardTitle className="text-base flex items-center gap-2">
-            <DollarSign className="h-4 w-4" />
+            <IndianRupee className="h-4 w-4" />
             Order Summary
           </CardTitle>
         </CardHeader>
         <CardContent className="space-y-2">
           <div className="flex justify-between text-sm">
             <span className="text-muted-foreground">Subtotal</span>
-            <span>${subtotal.toFixed(2)}</span>
+            <span>{formatCurrency(subtotal)}</span>
           </div>
           <div className="flex justify-between text-sm">
             <span className="text-muted-foreground">Tax</span>
-            <span>${tax.toFixed(2)}</span>
+            <span>{formatCurrency(tax)}</span>
           </div>
           <div className="flex justify-between text-sm">
             <span className="text-muted-foreground">Shipping</span>
-            <span>${shipping.toFixed(2)}</span>
+            <span>{formatCurrency(shipping)}</span>
           </div>
           <Separator />
           <div className="flex justify-between">
             <span className="font-semibold">Total</span>
             <span className="text-xl font-bold text-emerald-600">
-              ${total.toFixed(2)}
+              {formatCurrency(total)}
             </span>
           </div>
         </CardContent>

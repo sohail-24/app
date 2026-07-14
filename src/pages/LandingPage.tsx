@@ -155,7 +155,7 @@ export default function LandingPage() {
               { value: "500+", label: "Active Buyers" },
               { value: "120+", label: "Suppliers" },
               { value: "2,400+", label: "Products" },
-              { value: "$12M", label: "Monthly Volume" },
+              { value: "₹100Cr+", label: "Monthly Volume" },
             ].map((stat) => (
               <div key={stat.label}>
                 <p className="text-3xl lg:text-4xl font-bold">{stat.value}</p>

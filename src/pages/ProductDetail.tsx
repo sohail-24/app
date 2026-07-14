@@ -2,6 +2,7 @@ import { useParams, Link, useNavigate } from "react-router";
 import { trpc } from "@/providers/trpc";
 import { useAuth } from "@/hooks/useAuth";
 import { addGuestCartItem } from "@/lib/guestCart";
+import { formatCurrency } from "@/lib/i18n";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -162,14 +163,14 @@ export default function ProductDetail() {
             <CardContent className="p-5 space-y-4">
               <div className="flex items-baseline gap-3">
                 <span className="text-3xl font-bold text-emerald-600">
-                  ${unitPrice.toFixed(2)}
+                  {formatCurrency(unitPrice)}
                 </span>
                 <span className="text-sm text-muted-foreground">
                   / {unitLabels[product.unitType] ?? product.unitType}
                 </span>
                 {product.compareAtPrice && parseFloat(product.compareAtPrice.toString()) > 0 && (
                   <span className="text-lg text-muted-foreground line-through">
-                    ${parseFloat(product.compareAtPrice.toString()).toFixed(2)}
+                    {formatCurrency(product.compareAtPrice)}
                   </span>
                 )}
               </div>
@@ -214,7 +215,7 @@ export default function ProductDetail() {
 
               <div className="flex items-center justify-between py-2 bg-muted/50 rounded-lg px-3">
                 <span className="text-sm font-medium">Total</span>
-                <span className="text-lg font-bold">${totalPrice.toFixed(2)}</span>
+                <span className="text-lg font-bold">{formatCurrency(totalPrice)}</span>
               </div>
 
               <Button

@@ -2,6 +2,7 @@ import { Link } from "react-router";
 import { trpc } from "@/providers/trpc";
 import { useAuth } from "@/hooks/useAuth";
 import { useGuestCart } from "@/lib/guestCart";
+import { formatCurrency } from "@/lib/i18n";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -184,7 +185,7 @@ export default function Cart() {
                             </Button>
                           </div>
                           <p className="text-sm font-semibold">
-                            ${itemTotal.toFixed(2)}
+                            {formatCurrency(itemTotal)}
                           </p>
                         </div>
                       </div>
@@ -205,7 +206,7 @@ export default function Cart() {
                 <div className="space-y-2">
                   <div className="flex justify-between text-sm">
                     <span className="text-muted-foreground">Subtotal</span>
-                    <span>${total.toFixed(2)}</span>
+                    <span>{formatCurrency(total)}</span>
                   </div>
                   <div className="flex justify-between text-sm">
                     <span className="text-muted-foreground">Shipping</span>
@@ -220,7 +221,7 @@ export default function Cart() {
                 <div className="flex justify-between">
                   <span className="font-semibold">Total</span>
                   <span className="text-xl font-bold text-emerald-600">
-                    ${total.toFixed(2)}
+                    {formatCurrency(total)}
                   </span>
                 </div>
                 <Link to="/checkout">

@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { Link, useNavigate } from "react-router";
 import { trpc } from "@/providers/trpc";
+import { formatCurrency } from "@/lib/i18n";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -37,15 +38,15 @@ export default function Checkout() {
     city: "",
     state: "",
     postalCode: "",
-    country: "USA",
+    country: "IND",
     method: "standard",
   });
   const [buyerNotes, setBuyerNotes] = useState("");
 
   const items = cartQuery.data?.items ?? [];
   const subtotal = cartQuery.data?.total ?? 0;
-  const shippingCost = shipping.method === "express" ? 25 : 10;
-  const tax = subtotal * 0.08;
+  const shippingCost = shipping.method === "express" ? 2500 : 1000;
+  const tax = subtotal * 0.18;
   const total = subtotal + shippingCost + tax;
 
   if (cartQuery.isLoading) {
@@ -130,7 +131,7 @@ export default function Checkout() {
                     id="city"
                     value={shipping.city}
                     onChange={(e) => setShipping({ ...shipping, city: e.target.value })}
-                    placeholder="New York"
+                    placeholder="Mumbai"
                     required
                   />
                 </div>
@@ -140,7 +141,7 @@ export default function Checkout() {
                     id="state"
                     value={shipping.state}
                     onChange={(e) => setShipping({ ...shipping, state: e.target.value })}
-                    placeholder="NY"
+                    placeholder="Maharashtra"
                     required
                   />
                 </div>
@@ -152,7 +153,7 @@ export default function Checkout() {
                     onChange={(e) =>
                       setShipping({ ...shipping, postalCode: e.target.value })
                     }
-                    placeholder="10001"
+                    placeholder="400001"
                     required
                   />
                 </div>
@@ -166,9 +167,9 @@ export default function Checkout() {
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="USA">United States</SelectItem>
-                      <SelectItem value="CAN">Canada</SelectItem>
-                      <SelectItem value="MEX">Mexico</SelectItem>
+                      <SelectItem value="IND">India</SelectItem>
+                      <SelectItem value="ARE">United Arab Emirates</SelectItem>
+                      <SelectItem value="GBR">United Kingdom</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
@@ -185,10 +186,10 @@ export default function Checkout() {
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="standard">
-                      Standard Shipping ($10.00) — 5-7 business days
+                      Standard Shipping ({formatCurrency(1000)}) - 5-7 business days
                     </SelectItem>
                     <SelectItem value="express">
-                      Express Shipping ($25.00) — 2-3 business days
+                      Express Shipping ({formatCurrency(2500)}) - 2-3 business days
                     </SelectItem>
                   </SelectContent>
                 </Select>
@@ -227,7 +228,7 @@ export default function Checkout() {
                       </p>
                     </div>
                     <span className="font-medium">
-                      ${(parseFloat(item.unitPrice?.toString() ?? "0") * item.quantity).toFixed(2)}
+                      {formatCurrency(parseFloat(item.unitPrice?.toString() ?? "0") * item.quantity)}
                     </span>
                   </div>
                 ))}
@@ -238,15 +239,15 @@ export default function Checkout() {
               <div className="space-y-2">
                 <div className="flex justify-between text-sm">
                   <span className="text-muted-foreground">Subtotal</span>
-                  <span>${subtotal.toFixed(2)}</span>
+                  <span>{formatCurrency(subtotal)}</span>
                 </div>
                 <div className="flex justify-between text-sm">
                   <span className="text-muted-foreground">Shipping</span>
-                  <span>${shippingCost.toFixed(2)}</span>
+                  <span>{formatCurrency(shippingCost)}</span>
                 </div>
                 <div className="flex justify-between text-sm">
-                  <span className="text-muted-foreground">Tax (8%)</span>
-                  <span>${tax.toFixed(2)}</span>
+                  <span className="text-muted-foreground">GST (18%)</span>
+                  <span>{formatCurrency(tax)}</span>
                 </div>
               </div>
 
@@ -255,7 +256,7 @@ export default function Checkout() {
               <div className="flex justify-between">
                 <span className="font-semibold">Total</span>
                 <span className="text-xl font-bold text-emerald-600">
-                  ${total.toFixed(2)}
+                  {formatCurrency(total)}
                 </span>
               </div>
 
