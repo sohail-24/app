@@ -1,9 +1,8 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Link } from "react-router";
+import { Link, useNavigate } from "react-router";
 import { toast } from "sonner";
 import { trpc } from "@/providers/trpc";
-import { useManagedCategories } from "@/lib/categoryStore";
-import { DEFAULT_CURRENCY, formatCurrency, toNumber } from "@/lib/i18n";
+import { formatCurrency, toNumber } from "@/lib/i18n";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -42,27 +41,8 @@ type ImagePreview = {
   url: string;
 };
 
-type ProductDraft = {
-  id: string;
-  name: string;
-  sku: string;
-  barcode: string;
-  categoryId: string;
-  description: string;
-  purchasePrice: string;
-  sellingPrice: string;
-  openingStock: string;
-  minimumStock: string;
-  warehouse: string;
-  status: "draft" | "ready_to_publish";
-  currency: string;
-  imageNames: string[];
-  savedAt: string;
-};
-
-const DRAFTS_KEY = "freshflow-product-drafts";
-
 export default function AddProduct() {
+  const navigate = useNavigate();
   const inputRef = useRef<HTMLInputElement | null>(null);
   const imageUrlsRef = useRef<string[]>([]);
   const [isDragging, setIsDragging] = useState(false);
@@ -83,8 +63,24 @@ export default function AddProduct() {
     warehouse: "Main Warehouse",
   });
 
+  const utils = trpc.useUtils();
   const categoriesQuery = trpc.category.list.useQuery(undefined, { retry: false });
-  const { activeCategories } = useManagedCategories(categoriesQuery.data ?? []);
+  const activeCategories = categoriesQuery.data ?? [];
+  const createProduct = trpc.product.create.useMutation({
+    onSuccess: async () => {
+      await Promise.all([
+        utils.product.list.invalidate(),
+        utils.product.stats.invalidate(),
+        utils.inventory.list.invalidate(),
+        utils.inventory.stats.invalidate(),
+      ]);
+      toast.success("Product published successfully.");
+      navigate("/products");
+    },
+    onError: (error) => {
+      toast.error(error.message || "Could not save product. Please try again.");
+    },
+  });
   const margin = useMemo(() => {
     const selling = toNumber(form.sellingPrice);
     const purchase = toNumber(form.purchasePrice);
@@ -151,24 +147,31 @@ export default function AddProduct() {
     });
   };
 
-  const saveProduct = (status: ProductDraft["status"]) => {
+  const saveProduct = (status: "draft" | "active") => {
     setAttemptedSubmit(true);
     if (!isFormValid) {
       toast.error("Complete the required product fields before saving.");
       return;
     }
 
-    const draft: ProductDraft = {
-      id: crypto.randomUUID(),
-      ...form,
+    const orderedImages = [
+      ...images.filter((image) => image.id === primaryImageId),
+      ...images.filter((image) => image.id !== primaryImageId),
+    ];
+    createProduct.mutate({
+      name: form.name,
+      sku: form.sku,
+      barcode: form.barcode || undefined,
+      categoryId: Number(form.categoryId),
+      description: form.description || undefined,
+      purchasePrice: toNumber(form.purchasePrice),
+      sellingPrice: toNumber(form.sellingPrice),
+      openingStock: Math.max(0, Math.floor(toNumber(form.openingStock))),
+      minimumStock: Math.max(0, Math.floor(toNumber(form.minimumStock))),
+      warehouse: form.warehouse,
       status,
-      currency: DEFAULT_CURRENCY,
-      imageNames: images.map((image) => image.name),
-      savedAt: new Date().toISOString(),
-    };
-    const existing = JSON.parse(localStorage.getItem(DRAFTS_KEY) ?? "[]") as ProductDraft[];
-    localStorage.setItem(DRAFTS_KEY, JSON.stringify([draft, ...existing].slice(0, 25)));
-    toast.success(status === "draft" ? "Draft saved locally." : "Product prepared for publishing.");
+      images: orderedImages.map((image) => image.url),
+    });
   };
 
   return (
@@ -189,13 +192,13 @@ export default function AddProduct() {
             <Switch checked={publish} onCheckedChange={setPublish} id="publish-switch" />
             <Label htmlFor="publish-switch" className="text-sm">{publish ? "Publish" : "Draft"}</Label>
           </div>
-          <Button variant="outline" onClick={() => saveProduct("draft")} disabled={!isFormValid}>
+          <Button variant="outline" onClick={() => saveProduct("draft")} disabled={!isFormValid || createProduct.isPending}>
             <Save className="mr-2 h-4 w-4" />
             Save Draft
           </Button>
-          <Button onClick={() => saveProduct(publish ? "ready_to_publish" : "draft")} disabled={!isFormValid}>
+          <Button onClick={() => saveProduct(publish ? "active" : "draft")} disabled={!isFormValid || createProduct.isPending}>
             <UploadCloud className="mr-2 h-4 w-4" />
-            {publish ? "Publish Product" : "Save Product"}
+            {createProduct.isPending ? "Saving..." : publish ? "Publish Product" : "Save Product"}
           </Button>
         </div>
       </section>

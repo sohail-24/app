@@ -1,8 +1,11 @@
 import { useMemo, useState } from "react";
 import { Link } from "react-router";
+import { toast } from "sonner";
 import { trpc } from "@/providers/trpc";
-import { useManagedCategories } from "@/lib/categoryStore";
+import { useAuth } from "@/hooks/useAuth";
+import { addGuestCartItem } from "@/lib/guestCart";
 import { formatCurrency, formatDate, getPurchasePrice, getSku, toNumber, unitLabels } from "@/lib/i18n";
+import { getAppRole } from "@/lib/roles";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -60,21 +63,44 @@ export default function Products() {
   const [sort, setSort] = useState("newest");
   const [selected, setSelected] = useState<Set<number>>(new Set());
 
+  const { user } = useAuth();
+  const role = getAppRole(user);
+  const ownerMode = role !== "buyer";
+  const utils = trpc.useUtils();
   const categoriesQuery = trpc.category.list.useQuery(undefined, { retry: false });
-  const { activeCategories } = useManagedCategories(categoriesQuery.data ?? []);
+  const activeCategories = categoriesQuery.data ?? [];
   const productsQuery = trpc.product.list.useQuery(
     {
       search: search || undefined,
       categoryId: categoryId !== "all" ? Number(categoryId) : undefined,
       grade: grade !== "all" ? grade : undefined,
+      status: ownerMode ? undefined : "active",
       sortBy: sort === "name" ? "name" : sort.startsWith("price") ? "price" : "newest",
       sortOrder: sort === "price_asc" || sort === "name" ? "asc" : "desc",
     },
     { retry: false },
   );
+  const deleteProduct = trpc.product.delete.useMutation({
+    onSuccess: async () => {
+      await Promise.all([
+        utils.product.list.invalidate(),
+        utils.product.stats.invalidate(),
+        utils.inventory.list.invalidate(),
+        utils.inventory.stats.invalidate(),
+      ]);
+      setSelected(new Set());
+    },
+  });
+  const addToCart = trpc.cart.add.useMutation({
+    onSuccess: async () => {
+      await utils.cart.list.invalidate();
+      toast.success("Product added to cart.");
+    },
+    onError: (error) => toast.error(error.message || "Could not add product to cart."),
+  });
 
   const products = productsQuery.data ?? [];
-  const allVisibleSelected = products.length > 0 && products.every((product) => selected.has(product.id));
+  const allVisibleSelected = ownerMode && products.length > 0 && products.every((product) => selected.has(product.id));
 
   const productStats = useMemo(() => {
     const totalValue = products.reduce((total, product) => total + toNumber(product.unitPrice), 0);
@@ -102,31 +128,58 @@ export default function Products() {
     setSelected(new Set(products.map((product) => product.id)));
   };
 
+  const addProductToCart = (product: (typeof products)[number]) => {
+    const quantity = product.minimumOrderQuantity ?? 1;
+    if (user) {
+      addToCart.mutate({ productId: product.id, quantity });
+      return;
+    }
+
+    addGuestCartItem({
+      id: product.id,
+      productId: product.id,
+      productSlug: product.slug,
+      productName: product.name,
+      productImage: product.image,
+      productUnitType: product.unitType,
+      productUnitSize: product.unitSize,
+      quantity,
+      unitPrice: String(product.unitPrice),
+    });
+    toast.success("Product added to cart.");
+  };
+
   return (
     <div className="mx-auto flex w-full max-w-[1500px] flex-col gap-5">
       <section className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
         <div>
-          <h1 className="text-2xl font-semibold tracking-tight sm:text-3xl">Product Management</h1>
+          <h1 className="text-2xl font-semibold tracking-tight sm:text-3xl">
+            {ownerMode ? "Product Management" : "Browse Products"}
+          </h1>
           <p className="mt-1 text-sm text-muted-foreground">
-            Manage wholesale SKUs, pricing, categories, availability, and catalog operations.
+            {ownerMode
+              ? "Manage wholesale SKUs, pricing, categories, availability, and catalog operations."
+              : "Search wholesale products, compare supplier options, and build your purchase cart."}
           </p>
         </div>
-        <div className="flex flex-wrap gap-2">
-          <Button variant="outline">
-            <Upload className="mr-2 h-4 w-4" />
-            Import
-          </Button>
-          <Button variant="outline">
-            <Download className="mr-2 h-4 w-4" />
-            Export
-          </Button>
-          <Link to="/products/new">
-            <Button>
-              <Plus className="mr-2 h-4 w-4" />
-              Add Product
+        {ownerMode ? (
+          <div className="flex flex-wrap gap-2">
+            <Button variant="outline">
+              <Upload className="mr-2 h-4 w-4" />
+              Import
             </Button>
-          </Link>
-        </div>
+            <Button variant="outline">
+              <Download className="mr-2 h-4 w-4" />
+              Export
+            </Button>
+            <Link to="/products/new">
+              <Button>
+                <Plus className="mr-2 h-4 w-4" />
+                Add Product
+              </Button>
+            </Link>
+          </div>
+        ) : null}
       </section>
 
       <section className="grid gap-3 md:grid-cols-4">
@@ -212,7 +265,7 @@ export default function Products() {
             </div>
           </div>
 
-          {!categoriesQuery.isLoading && activeCategories.length === 0 && (
+          {ownerMode && !categoriesQuery.isLoading && activeCategories.length === 0 && (
             <div className="mt-4 flex flex-col gap-3 rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900 dark:border-amber-400/20 dark:bg-amber-400/10 dark:text-amber-100 sm:flex-row sm:items-center sm:justify-between">
               <span>No categories available.</span>
               <Link to="/categories">
@@ -223,7 +276,7 @@ export default function Products() {
             </div>
           )}
 
-          {selected.size > 0 && (
+      {ownerMode && selected.size > 0 && (
             <div className="mt-4 flex flex-wrap items-center justify-between gap-3 rounded-lg border bg-muted/40 p-3">
               <p className="text-sm font-medium">{selected.size} products selected</p>
               <div className="flex flex-wrap gap-2">
@@ -238,6 +291,19 @@ export default function Products() {
 
       {productsQuery.isLoading ? (
         <ProductSkeleton view={view} />
+      ) : productsQuery.error ? (
+        <Card>
+          <CardContent className="flex min-h-[280px] flex-col items-center justify-center p-8 text-center">
+            <Package className="mb-4 h-12 w-12 text-muted-foreground/50" />
+            <h3 className="text-base font-semibold">Could not load products</h3>
+            <p className="mt-1 max-w-md text-sm text-muted-foreground">
+              {productsQuery.error.message || "Check your connection and try again."}
+            </p>
+            <Button className="mt-5" variant="outline" onClick={() => productsQuery.refetch()}>
+              Retry
+            </Button>
+          </CardContent>
+        </Card>
       ) : products.length ? (
         view === "table" ? (
           <Card>
@@ -245,13 +311,15 @@ export default function Products() {
               <Table>
                 <TableHeader>
                   <TableRow>
-                    <TableHead className="w-10 pl-4">
-                      <Checkbox checked={allVisibleSelected} onCheckedChange={toggleAll} aria-label="Select all products" />
-                    </TableHead>
+                    {ownerMode && (
+                      <TableHead className="w-10 pl-4">
+                        <Checkbox checked={allVisibleSelected} onCheckedChange={toggleAll} aria-label="Select all products" />
+                      </TableHead>
+                    )}
                     <TableHead>Product</TableHead>
                     <TableHead>SKU</TableHead>
                     <TableHead>Category</TableHead>
-                    <TableHead>Purchase Price</TableHead>
+                    {ownerMode && <TableHead>Purchase Price</TableHead>}
                     <TableHead>Selling Price</TableHead>
                     <TableHead>Stock</TableHead>
                     <TableHead>Status</TableHead>
@@ -261,13 +329,15 @@ export default function Products() {
                 <TableBody>
                   {products.map((product) => (
                     <TableRow key={product.id}>
-                      <TableCell className="pl-4">
-                        <Checkbox
-                          checked={selected.has(product.id)}
-                          onCheckedChange={() => toggleSelected(product.id)}
-                          aria-label={`Select ${product.name}`}
-                        />
-                      </TableCell>
+                      {ownerMode && (
+                        <TableCell className="pl-4">
+                          <Checkbox
+                            checked={selected.has(product.id)}
+                            onCheckedChange={() => toggleSelected(product.id)}
+                            aria-label={`Select ${product.name}`}
+                          />
+                        </TableCell>
+                      )}
                       <TableCell>
                         <div className="flex min-w-[260px] items-center gap-3">
                           <ProductImage src={product.image} alt={product.name} />
@@ -283,7 +353,7 @@ export default function Products() {
                       </TableCell>
                       <TableCell className="font-mono text-xs">{getSku(product)}</TableCell>
                       <TableCell>{product.categoryName ?? "Uncategorized"}</TableCell>
-                      <TableCell>{formatCurrency(getPurchasePrice(product.unitPrice))}</TableCell>
+                      {ownerMode && <TableCell>{formatCurrency(getPurchasePrice(product.unitPrice))}</TableCell>}
                       <TableCell className="font-medium">{formatCurrency(product.unitPrice)}</TableCell>
                       <TableCell>
                         <span className="text-sm">
@@ -294,7 +364,14 @@ export default function Products() {
                         <StatusBadge status={product.status} />
                       </TableCell>
                       <TableCell className="pr-4 text-right">
-                        <RowActions slug={product.slug} />
+                        <RowActions
+                          slug={product.slug}
+                          onArchive={() => deleteProduct.mutate({ id: product.id })}
+                          disabled={deleteProduct.isPending}
+                          ownerMode={ownerMode}
+                          onAddToCart={() => addProductToCart(product)}
+                          cartPending={addToCart.isPending}
+                        />
                       </TableCell>
                     </TableRow>
                   ))}
@@ -307,13 +384,7 @@ export default function Products() {
             {products.map((product) => (
               <Card key={product.id} className="overflow-hidden">
                 <div className="aspect-[4/3] bg-muted">
-                  {product.image ? (
-                    <img src={product.image} alt={product.name} className="h-full w-full object-cover" />
-                  ) : (
-                    <div className="flex h-full items-center justify-center">
-                      <ImageIcon className="h-10 w-10 text-muted-foreground/50" />
-                    </div>
-                  )}
+                  <ProductImage src={product.image} alt={product.name} size="large" />
                 </div>
                 <CardContent className="space-y-3 p-4">
                   <div className="flex items-start justify-between gap-3">
@@ -327,8 +398,10 @@ export default function Products() {
                   </div>
                   <div className="grid grid-cols-2 gap-2 text-sm">
                     <div className="rounded-md bg-muted/60 p-2">
-                      <p className="text-xs text-muted-foreground">Purchase</p>
-                      <p className="font-medium">{formatCurrency(getPurchasePrice(product.unitPrice))}</p>
+                      <p className="text-xs text-muted-foreground">{ownerMode ? "Purchase" : "MOQ"}</p>
+                      <p className="font-medium">
+                        {ownerMode ? formatCurrency(getPurchasePrice(product.unitPrice)) : product.minimumOrderQuantity}
+                      </p>
                     </div>
                     <div className="rounded-md bg-muted/60 p-2">
                       <p className="text-xs text-muted-foreground">Selling</p>
@@ -339,6 +412,16 @@ export default function Products() {
                     <span>{product.categoryName ?? "Uncategorized"}</span>
                     <span>MOQ {product.minimumOrderQuantity}</span>
                   </div>
+                  {!ownerMode && (
+                    <div className="grid grid-cols-2 gap-2">
+                      <Button variant="outline" size="sm" onClick={() => addProductToCart(product)} disabled={addToCart.isPending}>
+                        Add to Cart
+                      </Button>
+                      <Link to={`/products/${product.slug}`}>
+                        <Button variant="secondary" size="sm" className="w-full">Request Quote</Button>
+                      </Link>
+                    </div>
+                  )}
                 </CardContent>
               </Card>
             ))}
@@ -352,14 +435,18 @@ export default function Products() {
             </div>
             <h3 className="text-base font-semibold">No products found</h3>
             <p className="mt-1 max-w-md text-sm text-muted-foreground">
-              Adjust filters or create your first wholesale SKU with pricing, inventory, and images.
+              {ownerMode
+                ? "Adjust filters or create your first wholesale SKU with pricing, inventory, and images."
+                : "Adjust filters or browse categories to find products for your next purchase order."}
             </p>
-            <Link to="/products/new">
-              <Button className="mt-5">
-                <Plus className="mr-2 h-4 w-4" />
-                Add Product
-              </Button>
-            </Link>
+            {ownerMode && (
+              <Link to="/products/new">
+                <Button className="mt-5">
+                  <Plus className="mr-2 h-4 w-4" />
+                  Add Product
+                </Button>
+              </Link>
+            )}
           </CardContent>
         </Card>
       )}
@@ -378,10 +465,32 @@ function Metric({ label, value, loading }: { label: string; value: string | numb
   );
 }
 
-function ProductImage({ src, alt }: { src?: string | null; alt: string }) {
+function ProductImage({
+  src,
+  alt,
+  size = "small",
+}: {
+  src?: string | null;
+  alt: string;
+  size?: "small" | "large";
+}) {
+  const [failed, setFailed] = useState(false);
+  const iconSize = size === "large" ? "h-10 w-10" : "h-5 w-5";
+
   return (
-    <div className="flex h-11 w-11 shrink-0 items-center justify-center overflow-hidden rounded-md border bg-muted">
-      {src ? <img src={src} alt={alt} className="h-full w-full object-cover" /> : <ImageIcon className="h-5 w-5 text-muted-foreground" />}
+    <div className={size === "large" ? "flex h-full w-full items-center justify-center overflow-hidden bg-muted" : "flex h-11 w-11 shrink-0 items-center justify-center overflow-hidden rounded-md border bg-muted"}>
+      {src && !failed ? (
+        <img
+          src={src}
+          alt={alt}
+          className="h-full w-full object-cover"
+          onError={() => setFailed(true)}
+        />
+      ) : (
+        <div className="flex h-full w-full items-center justify-center bg-gradient-to-br from-emerald-50 to-sky-50 text-emerald-700 dark:from-emerald-950/30 dark:to-sky-950/30 dark:text-emerald-200">
+          <ImageIcon className={iconSize} />
+        </div>
+      )}
     </div>
   );
 }
@@ -396,7 +505,21 @@ function StatusBadge({ status }: { status: string }) {
   return <Badge className={`rounded-md capitalize ${className}`}>{status}</Badge>;
 }
 
-function RowActions({ slug }: { slug: string }) {
+function RowActions({
+  slug,
+  onArchive,
+  disabled,
+  ownerMode,
+  onAddToCart,
+  cartPending,
+}: {
+  slug: string;
+  onArchive: () => void;
+  disabled?: boolean;
+  ownerMode: boolean;
+  onAddToCart: () => void;
+  cartPending?: boolean;
+}) {
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
@@ -411,9 +534,22 @@ function RowActions({ slug }: { slug: string }) {
             View details
           </Link>
         </DropdownMenuItem>
-        <DropdownMenuItem>Duplicate</DropdownMenuItem>
-        <DropdownMenuSeparator />
-        <DropdownMenuItem>Archive</DropdownMenuItem>
+        {ownerMode ? (
+          <>
+            <DropdownMenuItem>Duplicate</DropdownMenuItem>
+            <DropdownMenuSeparator />
+            <DropdownMenuItem onClick={onArchive} disabled={disabled}>Archive</DropdownMenuItem>
+          </>
+        ) : (
+          <>
+            <DropdownMenuItem onClick={onAddToCart} disabled={cartPending}>
+              Add to Cart
+            </DropdownMenuItem>
+            <DropdownMenuItem asChild>
+              <Link to={`/products/${slug}`}>Request Quote</Link>
+            </DropdownMenuItem>
+          </>
+        )}
       </DropdownMenuContent>
     </DropdownMenu>
   );

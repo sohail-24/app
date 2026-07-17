@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { createRouter, authedQuery } from "./middleware";
+import { createRouter, ownerQuery } from "./middleware";
 import {
   findAllInventory,
   findInventoryByProduct,
@@ -9,7 +9,7 @@ import {
 } from "./queries/inventory";
 
 export const inventoryRouter = createRouter({
-  list: authedQuery
+  list: ownerQuery
     .input(
       z
         .object({
@@ -23,19 +23,19 @@ export const inventoryRouter = createRouter({
       return findAllInventory(input ?? {});
     }),
 
-  byProduct: authedQuery
+  byProduct: ownerQuery
     .input(z.object({ productId: z.number() }))
     .query(async ({ input }) => {
       return findInventoryByProduct(input.productId);
     }),
 
-  bySupplier: authedQuery
+  bySupplier: ownerQuery
     .input(z.object({ supplierId: z.number() }))
     .query(async ({ input }) => {
       return findInventoryBySupplier(input.supplierId);
     }),
 
-  update: authedQuery
+  update: ownerQuery
     .input(
       z.object({
         id: z.number(),
@@ -62,7 +62,7 @@ export const inventoryRouter = createRouter({
       return { success: true };
     }),
 
-  stats: authedQuery
+  stats: ownerQuery
     .input(z.object({ supplierId: z.number().optional() }).optional())
     .query(async ({ input }) => {
       return getInventoryStats(input?.supplierId);

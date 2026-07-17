@@ -39,6 +39,7 @@ export default function ProductDetail() {
   const { slug } = useParams<{ slug: string }>();
   const navigate = useNavigate();
   const [quantity, setQuantity] = useState(1);
+  const [imageFailed, setImageFailed] = useState(false);
   const { user } = useAuth();
 
   const { data: product, isLoading } = trpc.product.bySlug.useQuery(
@@ -111,15 +112,16 @@ export default function ProductDetail() {
         {/* Image */}
         <div className="space-y-4">
           <div className="rounded-xl overflow-hidden bg-muted border aspect-square">
-            {product.image ? (
+            {product.image && !imageFailed ? (
               <img
                 src={product.image}
                 alt={product.name}
                 className="w-full h-full object-cover"
+                onError={() => setImageFailed(true)}
               />
             ) : (
-              <div className="flex items-center justify-center h-full">
-                <Package className="h-24 w-24 text-muted-foreground/20" />
+              <div className="flex h-full items-center justify-center bg-gradient-to-br from-emerald-50 to-sky-50 text-emerald-700 dark:from-emerald-950/30 dark:to-sky-950/30 dark:text-emerald-200">
+                <Package className="h-24 w-24" />
               </div>
             )}
           </div>

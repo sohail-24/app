@@ -1,8 +1,9 @@
 import { z } from "zod";
-import { createRouter, authedQuery } from "./middleware";
+import { createRouter, authedQuery, ownerQuery } from "./middleware";
 import { TRPCError } from "@trpc/server";
 import {
   findOrdersByBuyer,
+  findOrdersBySupplier,
   findOrderWithDetails,
   createOrder,
   createOrderItems,
@@ -22,7 +23,7 @@ export const orderRouter = createRouter({
         })
         .optional()
     )
-    .query(async ({ ctx }) => {
+    .query(async ({ ctx, input }) => {
       const companyId = ctx.user.companyId;
       if (!companyId) {
         throw new TRPCError({
@@ -30,7 +31,9 @@ export const orderRouter = createRouter({
           message: "User is not associated with a company",
         });
       }
-      // Default to buyer view
+      if (input?.type === "supplier") {
+        return findOrdersBySupplier(companyId);
+      }
       return findOrdersByBuyer(companyId);
     }),
 
@@ -130,7 +133,7 @@ export const orderRouter = createRouter({
       return { orderId, orderNumber, totalAmount: totalAmount.toFixed(2) };
     }),
 
-  status: authedQuery
+  status: ownerQuery
     .input(
       z.object({
         orderId: z.number(),

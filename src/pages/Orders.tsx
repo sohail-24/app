@@ -1,6 +1,8 @@
 import { Link } from "react-router";
 import { trpc } from "@/providers/trpc";
+import { useAuth } from "@/hooks/useAuth";
 import { formatCurrency } from "@/lib/i18n";
+import { getAppRole } from "@/lib/roles";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -32,24 +34,33 @@ const paymentColors: Record<string, string> = {
 };
 
 export default function Orders() {
-  const { data: orders, isLoading } = trpc.order.list.useQuery({});
+  const { user } = useAuth();
+  const role = getAppRole(user);
+  const ownerMode = role !== "buyer";
+  const { data: orders, isLoading } = trpc.order.list.useQuery({
+    type: ownerMode ? "supplier" : "buyer",
+  });
   const { data: stats } = trpc.order.stats.useQuery(undefined, { retry: false });
 
   return (
     <div className="space-y-6">
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-bold tracking-tight">Orders</h1>
+          <h1 className="text-2xl font-bold tracking-tight">
+            {ownerMode ? "Order Desk" : "Purchase Orders"}
+          </h1>
           <p className="text-muted-foreground text-sm mt-0.5">
-            View and track your purchase orders
+            {ownerMode ? "Receive, review, and track buyer purchase orders" : "View and track your purchase orders"}
           </p>
         </div>
-        <Link to="/products">
-          <Button className="bg-emerald-600 hover:bg-emerald-700">
-            <Store className="mr-2 h-4 w-4" />
-            New Order
-          </Button>
-        </Link>
+        {!ownerMode && (
+          <Link to="/products">
+            <Button className="bg-emerald-600 hover:bg-emerald-700">
+              <Store className="mr-2 h-4 w-4" />
+              New Order
+            </Button>
+          </Link>
+        )}
       </div>
 
       {/* Status Summary */}
@@ -71,57 +82,64 @@ export default function Orders() {
         </div>
       ) : orders && orders.length > 0 ? (
         <div className="space-y-3">
-          {orders.map((order) => (
-            <Link key={order.id} to={`/orders/${order.id}`}>
-              <Card className="hover:shadow-md transition-all cursor-pointer group">
-                <CardContent className="p-4">
-                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-                    <div className="flex items-center gap-4">
-                      <div className="h-10 w-10 rounded-lg bg-muted flex items-center justify-center shrink-0">
-                        <Package className="h-5 w-5 text-muted-foreground" />
+          {orders.map((order) => {
+            const counterpartyName =
+              "buyerName" in order
+                ? order.buyerName ?? "Unknown buyer"
+                : order.supplierName ?? "Unknown supplier";
+
+            return (
+              <Link key={order.id} to={`/orders/${order.id}`}>
+                <Card className="hover:shadow-md transition-all cursor-pointer group">
+                  <CardContent className="p-4">
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                      <div className="flex items-center gap-4">
+                        <div className="h-10 w-10 rounded-lg bg-muted flex items-center justify-center shrink-0">
+                          <Package className="h-5 w-5 text-muted-foreground" />
+                        </div>
+                        <div>
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <span className="font-semibold text-sm group-hover:text-emerald-600 transition-colors">
+                              {order.orderNumber}
+                            </span>
+                            <Badge
+                              variant="secondary"
+                              className={`text-xs capitalize ${statusColors[order.status] ?? ""}`}
+                            >
+                              {order.status}
+                            </Badge>
+                          </div>
+                          <div className="flex items-center gap-3 mt-1 text-xs text-muted-foreground">
+                            <span className="flex items-center gap-1">
+                              <Store className="h-3 w-3" />
+                              {counterpartyName}
+                            </span>
+                            <span className="flex items-center gap-1">
+                              <Calendar className="h-3 w-3" />
+                              {order.orderedAt
+                                ? new Date(order.orderedAt).toLocaleDateString()
+                                : "N/A"}
+                            </span>
+                          </div>
+                        </div>
                       </div>
-                      <div>
-                        <div className="flex items-center gap-2 flex-wrap">
-                          <span className="font-semibold text-sm group-hover:text-emerald-600 transition-colors">
-                            {order.orderNumber}
-                          </span>
-                          <Badge
-                            variant="secondary"
-                            className={`text-xs capitalize ${statusColors[order.status] ?? ""}`}
-                          >
-                            {order.status}
-                          </Badge>
+                      <div className="flex items-center gap-4">
+                        <div className="text-right">
+                          <p className="font-semibold text-sm">
+                            {formatCurrency(order.totalAmount)}
+                          </p>
+                          <p className={`text-xs capitalize ${paymentColors[order.paymentStatus] ?? ""}`}>
+                            {order.paymentStatus?.replace("_", " ")}
+                          </p>
                         </div>
-                        <div className="flex items-center gap-3 mt-1 text-xs text-muted-foreground">
-                          <span className="flex items-center gap-1">
-                            <Store className="h-3 w-3" />
-                            {order.supplierName ?? "Unknown"}
-                          </span>
-                          <span className="flex items-center gap-1">
-                            <Calendar className="h-3 w-3" />
-                            {order.orderedAt
-                              ? new Date(order.orderedAt).toLocaleDateString()
-                              : "N/A"}
-                          </span>
-                        </div>
+                        <ArrowRight className="h-4 w-4 text-muted-foreground group-hover:text-emerald-600 transition-colors" />
                       </div>
                     </div>
-                    <div className="flex items-center gap-4">
-                      <div className="text-right">
-                        <p className="font-semibold text-sm">
-                          {formatCurrency(order.totalAmount)}
-                        </p>
-                        <p className={`text-xs capitalize ${paymentColors[order.paymentStatus] ?? ""}`}>
-                          {order.paymentStatus?.replace("_", " ")}
-                        </p>
-                      </div>
-                      <ArrowRight className="h-4 w-4 text-muted-foreground group-hover:text-emerald-600 transition-colors" />
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-            </Link>
-          ))}
+                  </CardContent>
+                </Card>
+              </Link>
+            );
+          })}
         </div>
       ) : (
         <Card>
@@ -129,13 +147,15 @@ export default function Orders() {
             <ClipboardList className="h-12 w-12 mx-auto text-muted-foreground/40 mb-4" />
             <h3 className="text-lg font-semibold mb-1">No orders yet</h3>
             <p className="text-sm text-muted-foreground mb-6">
-              Start placing orders to see them here
+              {ownerMode ? "Incoming buyer orders will appear here" : "Start placing orders to see them here"}
             </p>
-            <Link to="/products">
-              <Button className="bg-emerald-600 hover:bg-emerald-700">
-                Browse Products
-              </Button>
-            </Link>
+            {!ownerMode && (
+              <Link to="/products">
+                <Button className="bg-emerald-600 hover:bg-emerald-700">
+                  Browse Products
+                </Button>
+              </Link>
+            )}
           </CardContent>
         </Card>
       )}

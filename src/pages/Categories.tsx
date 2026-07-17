@@ -1,7 +1,6 @@
 import { useMemo, useState } from "react";
 import { toast } from "sonner";
 import { trpc } from "@/providers/trpc";
-import { type ManagedCategory, useManagedCategories } from "@/lib/categoryStore";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -43,6 +42,15 @@ type FormState = {
   isActive: boolean;
 };
 
+type CategoryRow = {
+  id: number;
+  name: string;
+  slug: string;
+  description: string | null;
+  isActive: boolean;
+  sortOrder: number;
+};
+
 const emptyForm: FormState = {
   name: "",
   description: "",
@@ -53,15 +61,31 @@ export default function Categories() {
   const [search, setSearch] = useState("");
   const [form, setForm] = useState<FormState>(emptyForm);
   const [dialogOpen, setDialogOpen] = useState(false);
-  const categoriesQuery = trpc.category.list.useQuery(undefined, { retry: false });
-  const {
-    categories,
-    activeCategories,
-    createCategory,
-    updateCategory,
-    deleteCategory,
-    reorderCategory,
-  } = useManagedCategories(categoriesQuery.data ?? []);
+  const utils = trpc.useUtils();
+  const categoriesQuery = trpc.category.list.useQuery({ includeInactive: true }, { retry: false });
+  const categories = categoriesQuery.data ?? [];
+  const activeCategories = categories.filter((category) => category.isActive);
+  const createCategory = trpc.category.create.useMutation({
+    onSuccess: async () => {
+      await utils.category.list.invalidate();
+      toast.success("Category created.");
+    },
+    onError: (error) => toast.error(error.message || "Could not create category."),
+  });
+  const updateCategory = trpc.category.update.useMutation({
+    onSuccess: async () => {
+      await utils.category.list.invalidate();
+      toast.success("Category updated.");
+    },
+    onError: (error) => toast.error(error.message || "Could not update category."),
+  });
+  const deleteCategory = trpc.category.delete.useMutation({
+    onSuccess: async () => {
+      await utils.category.list.invalidate();
+      toast.success("Category marked inactive.");
+    },
+    onError: (error) => toast.error(error.message || "Could not delete category."),
+  });
 
   const filtered = useMemo(() => {
     const query = search.trim().toLowerCase();
@@ -78,7 +102,7 @@ export default function Categories() {
     setDialogOpen(true);
   };
 
-  const openEdit = (category: ManagedCategory) => {
+  const openEdit = (category: CategoryRow) => {
     setForm({
       id: category.id,
       name: category.name,
@@ -95,21 +119,30 @@ export default function Categories() {
     }
 
     if (form.id) {
-      updateCategory(form.id, {
+      updateCategory.mutate({
+        id: form.id,
         name: form.name.trim(),
         description: form.description.trim(),
         isActive: form.isActive,
       });
-      toast.success("Category updated.");
     } else {
-      createCategory({
+      createCategory.mutate({
         name: form.name.trim(),
         description: form.description.trim(),
         isActive: form.isActive,
+        sortOrder: categories.length + 1,
       });
-      toast.success("Category created.");
     }
     setDialogOpen(false);
+  };
+
+  const reorderCategory = (category: CategoryRow, direction: "up" | "down") => {
+    const index = categories.findIndex((item) => item.id === category.id);
+    const swapIndex = direction === "up" ? index - 1 : index + 1;
+    if (index < 0 || swapIndex < 0 || swapIndex >= categories.length) return;
+    const swap = categories[swapIndex];
+    updateCategory.mutate({ id: category.id, sortOrder: swap.sortOrder ?? swapIndex });
+    updateCategory.mutate({ id: swap.id, sortOrder: category.sortOrder ?? index });
   };
 
   return (
@@ -196,14 +229,14 @@ export default function Categories() {
                       </Badge>
                     </TableCell>
                     <TableCell>
-                      <Badge variant="outline" className="rounded-md capitalize">{category.source}</Badge>
+                      <Badge variant="outline" className="rounded-md">Database</Badge>
                     </TableCell>
                     <TableCell>
                       <div className="flex gap-1">
-                        <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => reorderCategory(category.id, "up")}>
+                        <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => reorderCategory(category, "up")}>
                           <ArrowUp className="h-4 w-4" />
                         </Button>
-                        <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => reorderCategory(category.id, "down")}>
+                        <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => reorderCategory(category, "down")}>
                           <ArrowDown className="h-4 w-4" />
                         </Button>
                       </div>
@@ -214,7 +247,7 @@ export default function Categories() {
                           variant="ghost"
                           size="icon"
                           className="h-8 w-8"
-                          onClick={() => updateCategory(category.id, { isActive: !category.isActive })}
+                          onClick={() => updateCategory.mutate({ id: category.id, isActive: !category.isActive })}
                         >
                           <Switch checked={category.isActive} aria-label="Toggle active state" />
                         </Button>
@@ -226,8 +259,7 @@ export default function Categories() {
                           size="icon"
                           className="h-8 w-8 text-destructive"
                           onClick={() => {
-                            deleteCategory(category.id);
-                            toast.success(category.source === "database" ? "Category marked inactive." : "Category deleted.");
+                            deleteCategory.mutate({ id: category.id });
                           }}
                         >
                           <Trash2 className="h-4 w-4" />
@@ -295,7 +327,7 @@ export default function Categories() {
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setDialogOpen(false)}>Cancel</Button>
-            <Button onClick={save} disabled={!form.name.trim()}>
+            <Button onClick={save} disabled={!form.name.trim() || createCategory.isPending || updateCategory.isPending}>
               {form.id ? "Save Category" : "Create Category"}
             </Button>
           </DialogFooter>

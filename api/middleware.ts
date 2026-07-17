@@ -1,4 +1,5 @@
 import { ErrorMessages } from "@contracts/constants";
+import { isOwner } from "@contracts/roles";
 import { initTRPC, TRPCError } from "@trpc/server";
 import superjson from "superjson";
 import type { TrpcContext } from "./context";
@@ -40,3 +41,17 @@ function requireRole(role: string) {
 
 export const authedQuery = t.procedure.use(requireAuth);
 export const adminQuery = authedQuery.use(requireRole("admin"));
+
+export const ownerQuery = authedQuery.use(
+  t.middleware(async ({ ctx, next }) => {
+    const user = ctx.user;
+    if (!user || (!isOwner(user) && user.role !== "admin")) {
+      throw new TRPCError({
+        code: "FORBIDDEN",
+        message: ErrorMessages.insufficientRole,
+      });
+    }
+
+    return next({ ctx: { ...ctx, user } });
+  }),
+);

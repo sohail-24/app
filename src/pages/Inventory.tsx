@@ -307,13 +307,7 @@ function InventoryTable({
               <TableRow key={item.id}>
                 <TableCell className="pl-4">
                   <div className="flex min-w-[240px] items-center gap-3">
-                    <div className="flex h-10 w-10 shrink-0 items-center justify-center overflow-hidden rounded-md border bg-muted">
-                      {item.productImage ? (
-                        <img src={item.productImage} alt={item.productName ?? ""} className="h-full w-full object-cover" />
-                      ) : (
-                        <Package className="h-5 w-5 text-muted-foreground" />
-                      )}
-                    </div>
+                    <InventoryImage src={item.productImage} alt={item.productName ?? "Product"} />
                     <div className="min-w-0">
                       <p className="truncate font-medium">{item.productName ?? `Product #${item.productId}`}</p>
                       <p className="truncate text-xs text-muted-foreground">{item.supplierName ?? "Unknown supplier"}</p>
@@ -340,6 +334,22 @@ function InventoryTable({
         </Table>
       </CardContent>
     </Card>
+  );
+}
+
+function InventoryImage({ src, alt }: { src?: string | null; alt: string }) {
+  const [failed, setFailed] = useState(false);
+
+  return (
+    <div className="flex h-10 w-10 shrink-0 items-center justify-center overflow-hidden rounded-md border bg-muted">
+      {src && !failed ? (
+        <img src={src} alt={alt} className="h-full w-full object-cover" onError={() => setFailed(true)} />
+      ) : (
+        <div className="flex h-full w-full items-center justify-center bg-gradient-to-br from-emerald-50 to-sky-50 text-emerald-700 dark:from-emerald-950/30 dark:to-sky-950/30 dark:text-emerald-200">
+          <Package className="h-5 w-5" />
+        </div>
+      )}
+    </div>
   );
 }
 

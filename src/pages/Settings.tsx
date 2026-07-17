@@ -72,7 +72,7 @@ export default function Settings() {
     { enabled: !!user?.companyId, retry: false },
   );
   const company = companyQuery.data ?? null;
-  const role = getAppRole(user, company);
+  const role = getAppRole(user);
   const [settings, setSettings] = useState<WorkspaceSettings>(() => {
     const saved = localStorage.getItem(SETTINGS_KEY);
     return saved ? { ...defaultSettings, ...JSON.parse(saved) } : defaultSettings;

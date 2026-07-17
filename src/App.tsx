@@ -4,6 +4,7 @@ import type { ReactNode } from "react";
 import { Skeleton } from "@/components/ui/skeleton";
 import AppLayout from "@/components/AppLayout";
 import { useAuth } from "@/hooks/useAuth";
+import { isOwner } from "@/lib/roles";
 
 // Lazy load all pages for code splitting
 const LandingPage = lazy(() => import("./pages/LandingPage"));
@@ -58,6 +59,31 @@ function ProtectedRoute({ children }: { children: ReactNode }) {
   return children;
 }
 
+function OwnerRoute({ children }: { children: ReactNode }) {
+  const location = useLocation();
+  const { user, isAuthenticated, isLoading } = useAuth();
+
+  if (isLoading) {
+    return <PageLoader />;
+  }
+
+  if (!isAuthenticated) {
+    const returnTo = `${location.pathname}${location.search}`;
+    return (
+      <Navigate
+        to={`/login?returnTo=${encodeURIComponent(returnTo)}`}
+        replace
+      />
+    );
+  }
+
+  if (!isOwner(user) && user?.role !== "admin") {
+    return <Navigate to="/dashboard" replace />;
+  }
+
+  return children;
+}
+
 function AppRoutes() {
   return (
     <Suspense fallback={<PageLoader />}>
@@ -80,17 +106,17 @@ function AppRoutes() {
           <Route
             path="/categories"
             element={
-              <ProtectedRoute>
+              <OwnerRoute>
                 <Categories />
-              </ProtectedRoute>
+              </OwnerRoute>
             }
           />
           <Route
             path="/products/new"
             element={
-              <ProtectedRoute>
+              <OwnerRoute>
                 <AddProduct />
-              </ProtectedRoute>
+              </OwnerRoute>
             }
           />
           <Route path="/products/:slug" element={<ProductDetail />} />
@@ -122,17 +148,17 @@ function AppRoutes() {
           <Route
             path="/inventory"
             element={
-              <ProtectedRoute>
+              <OwnerRoute>
                 <Inventory />
-              </ProtectedRoute>
+              </OwnerRoute>
             }
           />
           <Route
             path="/reports"
             element={
-              <ProtectedRoute>
+              <OwnerRoute>
                 <Reports />
-              </ProtectedRoute>
+              </OwnerRoute>
             }
           />
           <Route

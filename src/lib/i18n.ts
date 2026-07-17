@@ -58,7 +58,18 @@ export const unitLabels: Record<string, string> = {
   bag: "bag",
 };
 
-export function getSku(product: { id: number; slug?: string | null; categoryName?: string | null }) {
+export function getProductMeta(product: { tags?: string | null }) {
+  if (!product.tags) return {};
+  try {
+    return JSON.parse(product.tags) as { sku?: string; barcode?: string };
+  } catch {
+    return {};
+  }
+}
+
+export function getSku(product: { id: number; slug?: string | null; categoryName?: string | null; tags?: string | null }) {
+  const meta = getProductMeta(product);
+  if (meta.sku) return meta.sku;
   const categoryPrefix = (product.categoryName ?? "FF").slice(0, 3).toUpperCase();
   const slugCode = (product.slug ?? "ITEM").replace(/[^a-z0-9]/gi, "").slice(0, 4).toUpperCase();
   return `${categoryPrefix}-${slugCode}-${String(product.id).padStart(4, "0")}`;

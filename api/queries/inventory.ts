@@ -1,5 +1,5 @@
 import { getDb } from "./connection";
-import { inventory, products, companies } from "@db/schema";
+import { inventory, products, companies, type InsertInventory } from "@db/schema";
 import { eq, and, sql, asc } from "drizzle-orm";
 
 export async function findAllInventory(filters?: {
@@ -87,6 +87,11 @@ export async function updateInventory(
     .update(inventory)
     .set({ ...data, updatedAt: new Date() })
     .where(eq(inventory.id, id));
+}
+
+export async function createInventoryRecord(data: InsertInventory) {
+  const result = await getDb().insert(inventory).values(data).$returningId();
+  return result[0].id;
 }
 
 export async function getInventoryStats(supplierId?: number) {

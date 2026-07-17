@@ -1,5 +1,5 @@
 import { getDb } from "./connection";
-import { products, categories, companies } from "@db/schema";
+import { inventory, products, categories, companies, type InsertProduct } from "@db/schema";
 import {
   eq,
   and,
@@ -10,6 +10,7 @@ import {
   desc,
   asc,
   sql,
+  ne,
 } from "drizzle-orm";
 
 // ─── Product Queries ───
@@ -27,7 +28,11 @@ export async function findAllProducts(filters?: {
   sortOrder?: "asc" | "desc";
 }) {
   const db = getDb();
-  const conditions = [eq(products.status, "active")];
+  const conditions = [];
+
+  if (filters?.status) {
+    conditions.push(eq(products.status, filters.status as any));
+  }
 
   if (filters?.categoryId) {
     conditions.push(eq(products.categoryId, filters.categoryId));
@@ -99,7 +104,7 @@ export async function findAllProducts(filters?: {
     .from(products)
     .leftJoin(categories, eq(products.categoryId, categories.id))
     .leftJoin(companies, eq(products.supplierId, companies.id))
-    .where(and(...conditions))
+    .where(conditions.length ? and(...conditions) : undefined)
     .orderBy(orderByCol);
 }
 
@@ -145,6 +150,109 @@ export async function findProductBySlug(slug: string) {
     .limit(1);
 
   return rows[0] ?? null;
+}
+
+export async function findProductBySku(sku: string, excludeId?: number) {
+  const pattern = `%"sku":"${sku.replace(/"/g, '\\"')}"%`;
+  const conditions = [like(products.tags, pattern)];
+  if (excludeId) {
+    conditions.push(ne(products.id, excludeId));
+  }
+  const rows = await getDb()
+    .select({ id: products.id })
+    .from(products)
+    .where(and(...conditions))
+    .limit(1);
+  return rows[0] ?? null;
+}
+
+export async function createProductWithInventory(input: {
+  product: InsertProduct;
+  inventory: {
+    quantityOnHand: number;
+    reorderLevel: number;
+    warehouseLocation?: string;
+    notes?: string;
+  };
+}) {
+  const db = getDb();
+  return db.transaction(async (tx) => {
+    const productResult = await tx.insert(products).values(input.product).$returningId();
+    const productId = productResult[0].id;
+    const quantityOnHand = input.inventory.quantityOnHand;
+    const reorderLevel = input.inventory.reorderLevel;
+    const status =
+      quantityOnHand <= 0
+        ? "out_of_stock"
+        : quantityOnHand <= reorderLevel
+          ? "low_stock"
+          : "in_stock";
+
+    await tx.insert(inventory).values({
+      productId,
+      supplierId: input.product.supplierId,
+      quantityOnHand,
+      quantityReserved: 0,
+      quantityAvailable: quantityOnHand,
+      reorderLevel,
+      reorderQuantity: Math.max(reorderLevel * 2, 1),
+      warehouseLocation: input.inventory.warehouseLocation,
+      receivedDate: new Date(),
+      lastCountedAt: new Date(),
+      status,
+      notes: input.inventory.notes,
+    });
+
+    return productId;
+  });
+}
+
+export async function updateProduct(id: number, data: Partial<InsertProduct>) {
+  await getDb()
+    .update(products)
+    .set({ ...data, updatedAt: new Date() })
+    .where(eq(products.id, id));
+}
+
+export async function deleteProduct(id: number) {
+  await getDb()
+    .update(products)
+    .set({ status: "archived", updatedAt: new Date() })
+    .where(eq(products.id, id));
+}
+
+export async function getProductStats() {
+  const db = getDb();
+  const totalRows = await db.select({ count: sql<number>`count(*)` }).from(products);
+  const activeRows = await db
+    .select({ count: sql<number>`count(*)` })
+    .from(products)
+    .where(eq(products.status, "active"));
+  const avgRows = await db
+    .select({ value: sql<string>`avg(${products.unitPrice})` })
+    .from(products)
+    .where(eq(products.status, "active"));
+  const recent = await db
+    .select({
+      id: products.id,
+      name: products.name,
+      slug: products.slug,
+      unitPrice: products.unitPrice,
+      status: products.status,
+      createdAt: products.createdAt,
+      categoryName: categories.name,
+    })
+    .from(products)
+    .leftJoin(categories, eq(products.categoryId, categories.id))
+    .orderBy(desc(products.createdAt))
+    .limit(5);
+
+  return {
+    totalProducts: totalRows[0]?.count ?? 0,
+    activeProducts: activeRows[0]?.count ?? 0,
+    averageSellingPrice: avgRows[0]?.value ?? "0",
+    recentlyAdded: recent,
+  };
 }
 
 export async function findProductById(id: number) {
