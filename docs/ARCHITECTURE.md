@@ -165,6 +165,8 @@ The owner workspace is the ERP side of the product. It provides:
 
 Owner can create products, edit/update product records through the API, archive products, manage categories, inspect inventory, view reports, import/export UI affordances, and access business settings.
 
+Product editing is exposed through the owner-only `/products/:slug/edit` route. The edit screen uses the existing `product.bySlug` query and `product.update` mutation, preserves stored image URLs, and lets owners update catalog details, SKU metadata, wholesale units, minimum order quantity, grade, organic status, pricing, and publication status without exposing those controls to buyers.
+
 ## Buyer Workspace
 
 The buyer workspace is the marketplace/procurement side. It provides:
@@ -203,6 +205,7 @@ Buyers must never see administrative controls. The UI hides add/edit/delete prod
 - Owner-only route and API protection for ERP functions.
 - Product list/detail.
 - Product create with inventory creation.
+- Product edit screen for owner catalog maintenance.
 - Product archive mutation.
 - Category create/update/delete.
 - Inventory list/stats/update.

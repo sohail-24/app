@@ -3,6 +3,7 @@ import { trpc } from "@/providers/trpc";
 import { useAuth } from "@/hooks/useAuth";
 import { addGuestCartItem } from "@/lib/guestCart";
 import { formatCurrency } from "@/lib/i18n";
+import { getAppRole } from "@/lib/roles";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -18,6 +19,7 @@ import {
   Award,
   Package,
   Check,
+  Pencil,
   Minus,
   Plus,
 } from "lucide-react";
@@ -41,6 +43,7 @@ export default function ProductDetail() {
   const [quantity, setQuantity] = useState(1);
   const [imageFailed, setImageFailed] = useState(false);
   const { user } = useAuth();
+  const ownerMode = getAppRole(user) !== "buyer";
 
   const { data: product, isLoading } = trpc.product.bySlug.useQuery(
     { slug: slug! },
@@ -144,7 +147,17 @@ export default function ProductDetail() {
                 {gradeLabels[product.grade] ?? product.grade}
               </Badge>
             </div>
-            <h1 className="text-2xl font-bold tracking-tight">{product.name}</h1>
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+              <h1 className="text-2xl font-bold tracking-tight">{product.name}</h1>
+              {ownerMode && (
+                <Link to={`/products/${product.slug}/edit`}>
+                  <Button variant="outline" size="sm">
+                    <Pencil className="mr-2 h-4 w-4" />
+                    Edit
+                  </Button>
+                </Link>
+              )}
+            </div>
             <p className="text-muted-foreground text-sm mt-1">
               by{" "}
               <Link

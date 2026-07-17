@@ -11,6 +11,7 @@ const LandingPage = lazy(() => import("./pages/LandingPage"));
 const Dashboard = lazy(() => import("./pages/Dashboard"));
 const Products = lazy(() => import("./pages/Products"));
 const AddProduct = lazy(() => import("./pages/AddProduct"));
+const EditProduct = lazy(() => import("./pages/EditProduct"));
 const Categories = lazy(() => import("./pages/Categories"));
 const ProductDetail = lazy(() => import("./pages/ProductDetail"));
 const Cart = lazy(() => import("./pages/Cart"));
@@ -116,6 +117,14 @@ function AppRoutes() {
             element={
               <OwnerRoute>
                 <AddProduct />
+              </OwnerRoute>
+            }
+          />
+          <Route
+            path="/products/:slug/edit"
+            element={
+              <OwnerRoute>
+                <EditProduct />
               </OwnerRoute>
             }
           />

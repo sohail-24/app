@@ -63,3 +63,47 @@ Established the project documentation set as the source of truth and completed t
 - Implement import/export and bulk edit behavior.
 - Add tests for owner/buyer role gating.
 - Add tenant-scoped query middleware before multi-tenant SaaS expansion.
+
+## 2026-07-17 Product Edit Screen
+
+### Objective
+
+Complete the owner product edit workflow without redesigning the existing catalog architecture.
+
+### Files Modified
+
+- `src/App.tsx`
+- `src/pages/EditProduct.tsx`
+- `src/pages/Products.tsx`
+- `src/pages/ProductDetail.tsx`
+- `docs/ARCHITECTURE.md`
+- `docs/DEVELOPMENT_LOG.md`
+- `docs/ROADMAP.md`
+
+### Features Added
+
+- Added owner-only `/products/:slug/edit` route guarded by the existing `OwnerRoute`.
+- Added a product edit screen backed by the existing `product.bySlug` query and `product.update` mutation.
+- Added editable catalog fields for product details, SKU, barcode, category, publication status, wholesale unit, unit size, minimum order quantity, grade, organic flag, pricing, and image URLs.
+- Added owner edit entry points from the product catalog row action menu and product detail page.
+
+### UI Improvements
+
+- Preserved the ERP-style catalog management layout for the edit workflow.
+- Added image URL management with primary image ordering and graceful image fallbacks.
+- Kept buyer catalog and product detail controls free of administrative edit actions.
+
+### Bug Fixes
+
+- Closed the roadmap gap where the backend could update products but owners had no dedicated edit screen.
+
+### Known Issues
+
+- Product media still relies on stored URLs or browser-generated object URLs; durable object storage remains a future milestone.
+- Inventory stock and warehouse changes remain managed through the inventory module rather than the product edit screen.
+
+### Next Session Plan
+
+- Add role-gating tests for owner edit routes and buyer-hidden catalog controls.
+- Implement durable product media storage before expanding product image workflows further.
+- Continue with full order approval, packing, dispatch, and delivered controls.

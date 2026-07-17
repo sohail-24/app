@@ -35,6 +35,7 @@ import {
   List,
   MoreHorizontal,
   Package,
+  Pencil,
   Plus,
   Search,
   Upload,
@@ -536,6 +537,12 @@ function RowActions({
         </DropdownMenuItem>
         {ownerMode ? (
           <>
+            <DropdownMenuItem asChild>
+              <Link to={`/products/${slug}/edit`}>
+                <Pencil className="h-4 w-4" />
+                Edit product
+              </Link>
+            </DropdownMenuItem>
             <DropdownMenuItem>Duplicate</DropdownMenuItem>
             <DropdownMenuSeparator />
             <DropdownMenuItem onClick={onArchive} disabled={disabled}>Archive</DropdownMenuItem>

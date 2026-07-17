@@ -20,7 +20,7 @@
 - [x] Buyer-safe product catalog
 - [x] Product image fallback placeholders
 - [x] Documentation source of truth
-- [ ] Product edit screen
+- [x] Product edit screen
 - [ ] Full order approval/reject/dispatch/delivered controls
 - [ ] Dedicated customer management
 - [ ] Dedicated invoice management
