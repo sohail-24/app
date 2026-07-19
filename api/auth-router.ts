@@ -26,8 +26,6 @@ import {
   issueSessionCookies,
 } from "./auth/session";
 
-const businessTypeSchema = z.enum(["buyer", "supplier", "both"]);
-
 const mobileNumberSchema = z
   .string()
   .min(10)
@@ -37,38 +35,22 @@ const mobileNumberSchema = z
     } catch (error) {
       ctx.addIssue({
         code: "custom",
-        message:
-          error instanceof Error ? error.message : "Invalid mobile number.",
+        message: error instanceof Error ? error.message : "Invalid mobile number.",
       });
       return z.NEVER;
     }
   });
 
 function publicUser(user: User) {
-  const {
-    passwordHash: _passwordHash,
-    refreshTokenHash: _refreshTokenHash,
-    ...safeUser
-  } = user;
+  const { passwordHash: _passwordHash, refreshTokenHash: _refreshTokenHash, ...safeUser } = user;
   return safeUser;
 }
 
 function slugify(value: string) {
-  return (
-    value
-      .toLowerCase()
-      .trim()
-      .replace(/[^a-z0-9]+/g, "-")
-      .replace(/^-+|-+$/g, "") || "business"
-  );
+  return value.toLowerCase().trim().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "") || "business";
 }
 
-async function createCompany(input: {
-  name: string;
-  type: "buyer" | "supplier" | "both";
-  email?: string;
-  phone?: string;
-}) {
+async function createCompany(input: { name: string; type: "buyer" | "supplier" | "both"; email?: string; phone?: string }) {
   const baseSlug = slugify(input.name);
   let slug = baseSlug;
   let attempt = 1;
@@ -97,16 +79,15 @@ async function createCompany(input: {
 async function createUser(input: {
   unionId: string;
   authProvider: "local" | "mobile";
-  name: string;
-  mobileNumber: string;
+  name?: string;
+  mobileNumber?: string;
   email?: string;
   password?: string;
   companyId?: number;
   mobileVerified?: boolean;
 }) {
   const email = input.email?.toLowerCase();
-  const role =
-    email && email === env.ownerEmail.toLowerCase() ? "admin" : "user";
+  const role = email && email === env.ownerEmail.toLowerCase() ? "admin" : "user";
 
   const result = await getDb()
     .insert(users)
@@ -115,9 +96,7 @@ async function createUser(input: {
       authProvider: input.authProvider,
       name: input.name,
       email,
-      passwordHash: input.password
-        ? await hashSecret(input.password)
-        : undefined,
+      passwordHash: input.password ? await hashSecret(input.password) : undefined,
       role,
       companyId: input.companyId,
       phone: input.mobileNumber,
@@ -130,76 +109,57 @@ async function createUser(input: {
 
   const user = await findUserById(result[0].id);
   if (!user) {
-    throw new TRPCError({
-      code: "INTERNAL_SERVER_ERROR",
-      message: "Failed to create user",
-    });
+    throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Failed to create user" });
   }
 
   return user;
 }
 
-async function signInUser(
-  user: User,
-  requestHeaders: Headers,
-  responseHeaders: Headers,
-) {
+async function signInUser(user: User, requestHeaders: Headers, responseHeaders: Headers) {
   await updateLastSignIn(user.id);
   await issueSessionCookies(user, requestHeaders, responseHeaders);
-
   const refreshed = await findUserById(user.id);
   return publicUser(refreshed ?? user);
 }
 
 export const authRouter = createRouter({
-  me: publicQuery.query((opts) =>
-    opts.ctx.user ? publicUser(opts.ctx.user) : null,
-  ),
+  me: publicQuery.query((opts) => (opts.ctx.user ? publicUser(opts.ctx.user) : null)),
 
   register: publicQuery
     .input(
       z.object({
-        businessName: z.string().trim().min(2),
-        ownerName: z.string().trim().min(2),
-        mobileNumber: mobileNumberSchema,
-        email: z
-          .string()
-          .trim()
-          .email()
-          .transform((value) => value.toLowerCase())
-          .optional()
-          .or(z.literal("").transform(() => undefined)),
+        method: z.enum(["mobile", "email"]),
+        mobileNumber: mobileNumberSchema.optional(),
+        email: z.string().trim().email().transform((value) => value.toLowerCase()).optional(),
         password: z.string().min(5),
-        businessType: businessTypeSchema,
       }),
     )
     .mutation(async ({ ctx, input }) => {
-      const existingMobile = await findUserByMobileNumber(input.mobileNumber);
-      if (existingMobile) {
-        throw new TRPCError({
-          code: "CONFLICT",
-          message: "An account with this mobile number already exists.",
-        });
+      if (input.method === "mobile" && !input.mobileNumber) {
+        throw new TRPCError({ code: "BAD_REQUEST", message: "Mobile number is required." });
+      }
+      if (input.method === "email" && !input.email) {
+        throw new TRPCError({ code: "BAD_REQUEST", message: "Email is required." });
       }
 
+      if (input.mobileNumber && (await findUserByMobileNumber(input.mobileNumber))) {
+        throw new TRPCError({ code: "CONFLICT", message: "An account with this mobile number already exists." });
+      }
       if (input.email && (await findUserByEmail(input.email))) {
-        throw new TRPCError({
-          code: "CONFLICT",
-          message: "An account with this email already exists.",
-        });
+        throw new TRPCError({ code: "CONFLICT", message: "An account with this email already exists." });
       }
 
+      const contact = input.method === "mobile" ? input.mobileNumber! : input.email!;
       const companyId = await createCompany({
-        name: input.businessName,
-        type: input.businessType,
+        name: `FreshFlow Buyer ${contact.slice(-4)}`,
+        type: "buyer",
         email: input.email,
         phone: input.mobileNumber,
       });
-
       const user = await createUser({
-        unionId: `local:${input.email ?? input.mobileNumber}`,
+        unionId: `local:${contact}`,
         authProvider: "local",
-        name: input.ownerName,
+        name: input.method === "mobile" ? `Buyer ${input.mobileNumber!.slice(-4)}` : input.email!,
         mobileNumber: input.mobileNumber,
         email: input.email,
         password: input.password,
@@ -207,38 +167,27 @@ export const authRouter = createRouter({
         mobileVerified: false,
       });
 
-      return {
-        user: await signInUser(user, ctx.req.headers, ctx.resHeaders),
-      };
+      return { user: await signInUser(user, ctx.req.headers, ctx.resHeaders) };
     }),
 
   loginEmail: publicQuery
-    .input(
-      z.object({
-        email: z.string().trim().email().transform((value) => value.toLowerCase()),
-        password: z.string().min(1),
-      }),
-    )
+    .input(z.object({ email: z.string().trim().email().transform((value) => value.toLowerCase()), password: z.string().min(1) }))
     .mutation(async ({ ctx, input }) => {
       const user = await findUserByEmail(input.email);
-      if (!user?.passwordHash) {
-        throw new TRPCError({
-          code: "UNAUTHORIZED",
-          message: "Invalid email or password.",
-        });
+      if (!user?.passwordHash || !(await verifySecret(input.password, user.passwordHash))) {
+        throw new TRPCError({ code: "UNAUTHORIZED", message: "Invalid email or password." });
       }
+      return { user: await signInUser(user, ctx.req.headers, ctx.resHeaders) };
+    }),
 
-      const valid = await verifySecret(input.password, user.passwordHash);
-      if (!valid) {
-        throw new TRPCError({
-          code: "UNAUTHORIZED",
-          message: "Invalid email or password.",
-        });
+  loginMobile: publicQuery
+    .input(z.object({ mobileNumber: mobileNumberSchema, password: z.string().min(1) }))
+    .mutation(async ({ ctx, input }) => {
+      const user = await findUserByMobileNumber(input.mobileNumber);
+      if (!user?.passwordHash || !(await verifySecret(input.password, user.passwordHash))) {
+        throw new TRPCError({ code: "UNAUTHORIZED", message: "Invalid mobile number or password." });
       }
-
-      return {
-        user: await signInUser(user, ctx.req.headers, ctx.resHeaders),
-      };
+      return { user: await signInUser(user, ctx.req.headers, ctx.resHeaders) };
     }),
 
   requestMobileOtp: publicQuery
@@ -247,28 +196,15 @@ export const authRouter = createRouter({
       const code = generateOtpCode(env.isProduction ? undefined : env.mockOtpCode);
       await createOtpVerification(input.mobileNumber, code);
       await otpProvider.sendOtp({ mobileNumber: input.mobileNumber, code });
-
-      return {
-        success: true,
-        expiresInSeconds: 300,
-        devCode: env.isProduction ? undefined : code,
-      };
+      return { success: true, expiresInSeconds: 300, devCode: env.isProduction ? undefined : code };
     }),
 
   verifyMobileOtp: publicQuery
-    .input(
-      z.object({
-        mobileNumber: mobileNumberSchema,
-        otp: z.string().regex(/^\d{6}$/),
-      }),
-    )
+    .input(z.object({ mobileNumber: mobileNumberSchema, otp: z.string().regex(/^\d{6}$/) }))
     .mutation(async ({ ctx, input }) => {
       const verified = await verifyOtpCode(input.mobileNumber, input.otp);
       if (!verified) {
-        throw new TRPCError({
-          code: "UNAUTHORIZED",
-          message: "Invalid or expired OTP.",
-        });
+        throw new TRPCError({ code: "UNAUTHORIZED", message: "Invalid or expired OTP." });
       }
 
       let user = await findUserByMobileNumber(input.mobileNumber);
@@ -288,9 +224,7 @@ export const authRouter = createRouter({
         });
       }
 
-      return {
-        user: await signInUser(user, ctx.req.headers, ctx.resHeaders),
-      };
+      return { user: await signInUser(user, ctx.req.headers, ctx.resHeaders) };
     }),
 
   refresh: publicQuery.mutation(async ({ ctx }) => {

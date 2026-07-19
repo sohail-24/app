@@ -22,6 +22,7 @@ const Inventory = lazy(() => import("./pages/Inventory"));
 const Reports = lazy(() => import("./pages/Reports"));
 const Profile = lazy(() => import("./pages/Profile"));
 const Settings = lazy(() => import("./pages/Settings"));
+const OwnerPlaceholder = lazy(() => import("./pages/OwnerPlaceholder"));
 const Login = lazy(() => import("./pages/Login"));
 const NotFound = lazy(() => import("./pages/NotFound"));
 
@@ -186,6 +187,17 @@ function AppRoutes() {
               </ProtectedRoute>
             }
           />
+          {["/customers", "/delivery-zones", "/gst-rules", "/shipping-rules", "/coupons", "/notifications", "/staff"].map((path) => (
+            <Route
+              key={path}
+              path={path}
+              element={
+                <OwnerRoute>
+                  <OwnerPlaceholder />
+                </OwnerRoute>
+              }
+            />
+          ))}
         </Route>
 
         <Route path="*" element={<NotFound />} />

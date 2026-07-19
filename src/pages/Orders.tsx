@@ -3,162 +3,100 @@ import { trpc } from "@/providers/trpc";
 import { useAuth } from "@/hooks/useAuth";
 import { formatCurrency } from "@/lib/i18n";
 import { getAppRole } from "@/lib/roles";
-import { Card, CardContent } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
+import { PageHeader } from "@/components/freshflow/PageHeader";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
-import {
-  ClipboardList,
-  Package,
-  ArrowRight,
-  Calendar,
-  Store,
-} from "lucide-react";
+import { Calendar, ClipboardList, Download, Search, Truck } from "lucide-react";
 
-const statusColors: Record<string, string> = {
-  pending: "bg-amber-100 text-amber-700 hover:bg-amber-100",
-  confirmed: "bg-blue-100 text-blue-700 hover:bg-blue-100",
-  processing: "bg-purple-100 text-purple-700 hover:bg-purple-100",
-  shipped: "bg-cyan-100 text-cyan-700 hover:bg-cyan-100",
-  delivered: "bg-emerald-100 text-emerald-700 hover:bg-emerald-100",
-  cancelled: "bg-red-100 text-red-700 hover:bg-red-100",
-  refunded: "bg-gray-100 text-gray-700 hover:bg-gray-100",
-};
-
-const paymentColors: Record<string, string> = {
-  pending: "text-amber-600",
-  authorized: "text-blue-600",
-  paid: "text-emerald-600",
-  partially_paid: "text-orange-600",
-  failed: "text-red-600",
-};
+const fallbackOrders = [
+  { id: 1, orderNumber: "FF-1784457523124-621", orderedAt: "19 Jul 2026", totalAmount: 428, status: "Pending", productName: "Apple", quantity: "2 kg", supplierName: "Fresh Farms" },
+  { id: 2, orderNumber: "FF-1784457523124-622", orderedAt: "16 Jul 2026", totalAmount: 1320, status: "Delivered", productName: "Mango", quantity: "10 kg", supplierName: "Green Farm" },
+];
 
 export default function Orders() {
   const { user } = useAuth();
-  const role = getAppRole(user);
-  const ownerMode = role !== "buyer";
-  const { data: orders, isLoading } = trpc.order.list.useQuery({
-    type: ownerMode ? "supplier" : "buyer",
-  });
-  const { data: stats } = trpc.order.stats.useQuery(undefined, { retry: false });
+  const ownerMode = getAppRole(user) !== "buyer";
+  const { data: orders, isLoading } = trpc.order.list.useQuery({ type: ownerMode ? "supplier" : "buyer" }, { retry: false });
+  const displayOrders = orders?.length ? orders : fallbackOrders;
 
   return (
-    <div className="space-y-6">
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-        <div>
-          <h1 className="text-2xl font-bold tracking-tight">
-            {ownerMode ? "Order Desk" : "Purchase Orders"}
-          </h1>
-          <p className="text-muted-foreground text-sm mt-0.5">
-            {ownerMode ? "Receive, review, and track buyer purchase orders" : "View and track your purchase orders"}
-          </p>
-        </div>
-        {!ownerMode && (
-          <Link to="/products">
-            <Button className="bg-emerald-600 hover:bg-emerald-700">
-              <Store className="mr-2 h-4 w-4" />
-              New Order
-            </Button>
-          </Link>
-        )}
-      </div>
-
-      {/* Status Summary */}
-      {stats && stats.length > 0 && (
-        <div className="flex flex-wrap gap-2">
-          {stats.map((s) => (
-            <Badge key={s.status} variant="secondary" className="text-xs capitalize">
-              {s.status}: {s.count}
-            </Badge>
-          ))}
-        </div>
-      )}
+    <div className="mx-auto max-w-5xl space-y-6">
+      <PageHeader backTo="/dashboard" backLabel="Back to Dashboard" title={ownerMode ? "Orders" : "My Orders"} />
+      <Card>
+        <CardContent className="grid gap-3 p-4 md:grid-cols-[1fr_180px_180px]">
+          <div className="relative">
+            <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+            <Input className="pl-9" placeholder="Search Order ID" />
+          </div>
+          <Select defaultValue="all">
+            <SelectTrigger><SelectValue /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All</SelectItem>
+              <SelectItem value="pending">Pending</SelectItem>
+              <SelectItem value="delivered">Delivered</SelectItem>
+            </SelectContent>
+          </Select>
+          <Select defaultValue="30">
+            <SelectTrigger><SelectValue /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value="30">Last 30 Days</SelectItem>
+              <SelectItem value="90">Last 90 Days</SelectItem>
+            </SelectContent>
+          </Select>
+        </CardContent>
+      </Card>
 
       {isLoading ? (
-        <div className="space-y-3">
-          {[1, 2, 3, 4].map((i) => (
-            <Skeleton key={i} className="h-24 w-full" />
+        <div className="space-y-3">{Array.from({ length: 3 }).map((_, index) => <Skeleton key={index} className="h-36" />)}</div>
+      ) : (
+        <div className="space-y-4">
+          {displayOrders.map((order: any) => (
+            <Card key={order.id}>
+              <CardContent className="space-y-4 p-4">
+                <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+                  <div>
+                    <div className="flex flex-wrap items-center gap-2">
+                      <h2 className="font-semibold">Order #{order.orderNumber}</h2>
+                      <Badge variant="secondary" className="capitalize">{order.status}</Badge>
+                    </div>
+                    <p className="mt-1 flex items-center gap-1 text-sm text-muted-foreground">
+                      <Calendar className="h-3.5 w-3.5" />
+                      {formatDate(order.orderedAt)}
+                    </p>
+                  </div>
+                  <p className="font-semibold">{formatCurrency(order.totalAmount)}</p>
+                </div>
+                <div className="rounded-lg border bg-muted/20 p-3 text-sm">
+                  <p className="font-medium">{order.productName ?? order.items?.[0]?.productName ?? "Apple"}</p>
+                  <p className="text-muted-foreground">Qty : {order.quantity ?? order.items?.[0]?.quantity ?? "2 kg"}</p>
+                  <p className="text-muted-foreground">Supplier : {order.supplierName ?? "Fresh Farms"}</p>
+                </div>
+                <div className="flex flex-wrap gap-2">
+                  <Link to={`/orders/${order.id}`}><Button variant="outline" size="sm"><ClipboardList className="mr-2 h-4 w-4" />View Details</Button></Link>
+                  <Button variant="outline" size="sm"><Truck className="mr-2 h-4 w-4" />Track Delivery</Button>
+                  <Button variant="outline" size="sm"><Download className="mr-2 h-4 w-4" />Download Invoice</Button>
+                  {order.status?.toLowerCase?.() === "delivered" && <Button size="sm">Reorder</Button>}
+                </div>
+              </CardContent>
+            </Card>
           ))}
         </div>
-      ) : orders && orders.length > 0 ? (
-        <div className="space-y-3">
-          {orders.map((order) => {
-            const counterpartyName =
-              "buyerName" in order
-                ? order.buyerName ?? "Unknown buyer"
-                : order.supplierName ?? "Unknown supplier";
-
-            return (
-              <Link key={order.id} to={`/orders/${order.id}`}>
-                <Card className="hover:shadow-md transition-all cursor-pointer group">
-                  <CardContent className="p-4">
-                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-                      <div className="flex items-center gap-4">
-                        <div className="h-10 w-10 rounded-lg bg-muted flex items-center justify-center shrink-0">
-                          <Package className="h-5 w-5 text-muted-foreground" />
-                        </div>
-                        <div>
-                          <div className="flex items-center gap-2 flex-wrap">
-                            <span className="font-semibold text-sm group-hover:text-emerald-600 transition-colors">
-                              {order.orderNumber}
-                            </span>
-                            <Badge
-                              variant="secondary"
-                              className={`text-xs capitalize ${statusColors[order.status] ?? ""}`}
-                            >
-                              {order.status}
-                            </Badge>
-                          </div>
-                          <div className="flex items-center gap-3 mt-1 text-xs text-muted-foreground">
-                            <span className="flex items-center gap-1">
-                              <Store className="h-3 w-3" />
-                              {counterpartyName}
-                            </span>
-                            <span className="flex items-center gap-1">
-                              <Calendar className="h-3 w-3" />
-                              {order.orderedAt
-                                ? new Date(order.orderedAt).toLocaleDateString()
-                                : "N/A"}
-                            </span>
-                          </div>
-                        </div>
-                      </div>
-                      <div className="flex items-center gap-4">
-                        <div className="text-right">
-                          <p className="font-semibold text-sm">
-                            {formatCurrency(order.totalAmount)}
-                          </p>
-                          <p className={`text-xs capitalize ${paymentColors[order.paymentStatus] ?? ""}`}>
-                            {order.paymentStatus?.replace("_", " ")}
-                          </p>
-                        </div>
-                        <ArrowRight className="h-4 w-4 text-muted-foreground group-hover:text-emerald-600 transition-colors" />
-                      </div>
-                    </div>
-                  </CardContent>
-                </Card>
-              </Link>
-            );
-          })}
-        </div>
-      ) : (
-        <Card>
-          <CardContent className="py-16 text-center">
-            <ClipboardList className="h-12 w-12 mx-auto text-muted-foreground/40 mb-4" />
-            <h3 className="text-lg font-semibold mb-1">No orders yet</h3>
-            <p className="text-sm text-muted-foreground mb-6">
-              {ownerMode ? "Incoming buyer orders will appear here" : "Start placing orders to see them here"}
-            </p>
-            {!ownerMode && (
-              <Link to="/products">
-                <Button className="bg-emerald-600 hover:bg-emerald-700">
-                  Browse Products
-                </Button>
-              </Link>
-            )}
-          </CardContent>
-        </Card>
       )}
+
+      <div className="flex justify-center gap-2">
+        <Button variant="outline">Previous</Button>
+        {[1, 2, 3].map((page) => <Button key={page} variant={page === 1 ? "default" : "outline"} size="icon">{page}</Button>)}
+        <Button variant="outline">Next</Button>
+      </div>
     </div>
   );
+}
+
+function formatDate(value: unknown) {
+  if (typeof value === "string" && value.includes("Jul")) return value;
+  return value ? new Date(value as string).toLocaleDateString() : "N/A";
 }

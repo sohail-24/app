@@ -1,304 +1,176 @@
-import { useParams, Link, useNavigate } from "react-router";
+import { useMemo, useState } from "react";
+import { Link, useNavigate, useParams } from "react-router";
+import { toast } from "sonner";
 import { trpc } from "@/providers/trpc";
 import { useAuth } from "@/hooks/useAuth";
 import { addGuestCartItem } from "@/lib/guestCart";
-import { formatCurrency } from "@/lib/i18n";
-import { getAppRole } from "@/lib/roles";
-import { Card, CardContent } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
+import { productSamples } from "@/lib/freshflowData";
+import { formatCurrency, toNumber, unitLabels } from "@/lib/i18n";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Input } from "@/components/ui/input";
-import { Separator } from "@/components/ui/separator";
-import {
-  ShoppingCart,
-  ArrowLeft,
-  Leaf,
-  MapPin,
-  Calendar,
-  Award,
-  Package,
-  Check,
-  Pencil,
-  Minus,
-  Plus,
-} from "lucide-react";
-import { useState } from "react";
-
-const gradeLabels: Record<string, string> = {
-  premium: "Premium",
-  grade_a: "Grade A",
-  grade_b: "Grade B",
-  standard: "Standard",
-};
-
-const unitLabels: Record<string, string> = {
-  kg: "KG", lb: "LB", case: "Case", pallet: "Pallet",
-  each: "Each", bunch: "Bunch", box: "Box", bag: "Bag",
-};
+import { ArrowLeft, Check, Heart, Minus, Package, Plus, Share2, ShoppingCart, Zap } from "lucide-react";
 
 export default function ProductDetail() {
   const { slug } = useParams<{ slug: string }>();
   const navigate = useNavigate();
-  const [quantity, setQuantity] = useState(1);
-  const [imageFailed, setImageFailed] = useState(false);
   const { user } = useAuth();
-  const ownerMode = getAppRole(user) !== "buyer";
-
-  const { data: product, isLoading } = trpc.product.bySlug.useQuery(
-    { slug: slug! },
-    { enabled: !!slug }
-  );
-
-  const cartQuery = trpc.cart.list.useQuery(undefined, {
-    enabled: !!user,
-    retry: false,
-  });
+  const [imageFailed, setImageFailed] = useState(false);
+  const { data, isLoading } = trpc.product.bySlug.useQuery({ slug: slug! }, { enabled: !!slug, retry: false });
+  const utils = trpc.useUtils();
   const addToCart = trpc.cart.add.useMutation({
-    onSuccess: () => {
-      cartQuery.refetch();
+    onSuccess: async () => {
+      await utils.cart.list.invalidate();
+      toast.success("Product added to cart.");
     },
+    onError: (error) => toast.error(error.message || "Could not add product to cart."),
   });
+  const fallback = productSamples.find((item) => item.slug === slug) ?? productSamples[0];
+  const product: any = data ?? fallback;
+  const minQty = product.minimumOrderQuantity ?? product.moq ?? 1;
+  const [quantity, setQuantity] = useState(minQty);
+  const price = toNumber(product.unitPrice ?? product.price);
+  const compareAt = toNumber(product.compareAtPrice ?? product.compareAt);
+  const unit = product.unitType ?? product.unit ?? "kg";
+  const discount = compareAt > price ? Math.round(((compareAt - price) / compareAt) * 100) : 15;
+  const related = useMemo(() => productSamples.filter((item) => item.slug !== product.slug), [product.slug]);
 
   if (isLoading) {
     return (
-      <div className="max-w-4xl mx-auto space-y-6">
+      <div className="mx-auto max-w-5xl space-y-6">
         <Skeleton className="h-8 w-48" />
-        <div className="grid md:grid-cols-2 gap-8">
-          <Skeleton className="h-80" />
-          <div className="space-y-4">
-            <Skeleton className="h-8 w-3/4" />
-            <Skeleton className="h-4 w-1/2" />
-            <Skeleton className="h-20 w-full" />
-            <Skeleton className="h-10 w-full" />
-          </div>
-        </div>
+        <Skeleton className="h-[520px] w-full" />
       </div>
     );
   }
 
-  if (!product) {
-    return (
-      <div className="text-center py-16">
-        <Package className="h-12 w-12 mx-auto text-muted-foreground/40 mb-4" />
-        <h1 className="text-xl font-semibold mb-2">Product Not Found</h1>
-        <p className="text-muted-foreground mb-4">
-          The product you're looking for doesn't exist or has been removed.
-        </p>
-        <Link to="/products">
-          <Button>Browse Products</Button>
-        </Link>
-      </div>
-    );
+  function addProduct(destination?: string) {
+    if (user && data) {
+      addToCart.mutate({ productId: data.id, quantity }, { onSuccess: () => destination && navigate(destination) });
+      return;
+    }
+
+    addGuestCartItem({
+      id: product.id,
+      productId: product.id,
+      productSlug: product.slug,
+      productName: product.name,
+      productImage: product.image ?? null,
+      productUnitType: unit,
+      productUnitSize: product.unitSize ?? unit,
+      quantity,
+      unitPrice: String(price),
+    });
+    toast.success("Product added to cart.");
+    if (destination) navigate(destination);
   }
-
-  const unitPrice = parseFloat(product.unitPrice?.toString() ?? "0");
-  const totalPrice = unitPrice * quantity;
-  const minQty = product.minimumOrderQuantity ?? 1;
-
-  const certifications = product.certifications
-    ? JSON.parse(product.certifications as string)
-    : [];
 
   return (
-    <div className="max-w-5xl mx-auto space-y-6">
-      {/* Breadcrumb */}
-      <button
-        onClick={() => navigate(-1)}
-        className="flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground transition-colors"
-      >
-        <ArrowLeft className="h-4 w-4" />
-        Back to Products
-      </button>
+    <div className="mx-auto max-w-6xl space-y-5">
+      <section className="flex flex-wrap items-center justify-between gap-3 border-b pb-3">
+        <Link to="/products" className="inline-flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground">
+          <ArrowLeft className="h-4 w-4" />
+          Back to Products
+        </Link>
+        <div className="flex gap-2">
+          <Button variant="outline" size="sm"><Heart className="mr-2 h-4 w-4" />Wishlist</Button>
+          <Button variant="outline" size="sm"><Share2 className="mr-2 h-4 w-4" />Share</Button>
+        </div>
+      </section>
 
-      <div className="grid lg:grid-cols-2 gap-8">
-        {/* Image */}
-        <div className="space-y-4">
-          <div className="rounded-xl overflow-hidden bg-muted border aspect-square">
+      <section className="grid gap-8 lg:grid-cols-[minmax(280px,360px)_minmax(0,1fr)]">
+        <div className="overflow-hidden rounded-lg border bg-muted">
+          <div className="flex aspect-square items-center justify-center text-xl font-semibold text-muted-foreground">
             {product.image && !imageFailed ? (
-              <img
-                src={product.image}
-                alt={product.name}
-                className="w-full h-full object-cover"
-                onError={() => setImageFailed(true)}
-              />
-            ) : (
-              <div className="flex h-full items-center justify-center bg-gradient-to-br from-emerald-50 to-sky-50 text-emerald-700 dark:from-emerald-950/30 dark:to-sky-950/30 dark:text-emerald-200">
-                <Package className="h-24 w-24" />
-              </div>
-            )}
+              <img src={product.image} alt={product.name} className="h-full w-full object-cover" onError={() => setImageFailed(true)} />
+            ) : product.icon ? product.icon : <Package className="h-16 w-16" />}
           </div>
         </div>
 
-        {/* Details */}
-        <div className="space-y-6">
+        <div className="space-y-5">
+          <div className="flex flex-wrap gap-2">
+            <Badge variant="outline">{product.categoryName ?? product.category}</Badge>
+            <Badge variant="secondary">{product.grade ?? "Grade A"}</Badge>
+          </div>
+          <p className="text-sm text-muted-foreground">⭐ {product.rating ?? "4.8"} (356 Reviews)</p>
           <div>
-            <div className="flex items-center gap-2 mb-2 flex-wrap">
-              <Badge variant="outline" className="text-xs">
-                {product.categoryName}
-              </Badge>
-              {product.organic && (
-                <Badge className="bg-emerald-600 text-white hover:bg-emerald-700 text-xs">
-                  <Leaf className="mr-1 h-3 w-3" />
-                  Organic
-                </Badge>
-              )}
-              <Badge variant="secondary" className="text-xs">
-                {gradeLabels[product.grade] ?? product.grade}
-              </Badge>
-            </div>
-            <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-              <h1 className="text-2xl font-bold tracking-tight">{product.name}</h1>
-              {ownerMode && (
-                <Link to={`/products/${product.slug}/edit`}>
-                  <Button variant="outline" size="sm">
-                    <Pencil className="mr-2 h-4 w-4" />
-                    Edit
-                  </Button>
-                </Link>
-              )}
-            </div>
-            <p className="text-muted-foreground text-sm mt-1">
-              by{" "}
-              <Link
-                to={`/products?supplier=${product.supplierId}`}
-                className="text-emerald-600 hover:underline"
-              >
-                {product.supplierName}
-              </Link>
-            </p>
+            <h1 className="text-3xl font-semibold tracking-tight">{product.name}</h1>
+            <p className="mt-1 text-sm text-muted-foreground">by {product.supplierName ?? product.supplier ?? "Fresh Farms"}</p>
           </div>
-
-          <p className="text-sm text-muted-foreground leading-relaxed">
-            {product.description}
-          </p>
-
-          {/* Pricing */}
-          <Card>
-            <CardContent className="p-5 space-y-4">
-              <div className="flex items-baseline gap-3">
-                <span className="text-3xl font-bold text-emerald-600">
-                  {formatCurrency(unitPrice)}
-                </span>
-                <span className="text-sm text-muted-foreground">
-                  / {unitLabels[product.unitType] ?? product.unitType}
-                </span>
-                {product.compareAtPrice && parseFloat(product.compareAtPrice.toString()) > 0 && (
-                  <span className="text-lg text-muted-foreground line-through">
-                    {formatCurrency(product.compareAtPrice)}
-                  </span>
-                )}
-              </div>
-
-              <Separator />
-
-              {/* Quantity Selector */}
-              <div className="space-y-2">
-                <label className="text-sm font-medium">Quantity</label>
-                <div className="flex items-center gap-3">
-                  <Button
-                    variant="outline"
-                    size="icon"
-                    className="h-9 w-9"
-                    onClick={() => setQuantity(Math.max(minQty, quantity - 1))}
-                    disabled={quantity <= minQty}
-                  >
-                    <Minus className="h-4 w-4" />
-                  </Button>
-                  <Input
-                    type="number"
-                    value={quantity}
-                    onChange={(e) =>
-                      setQuantity(Math.max(minQty, parseInt(e.target.value) || minQty))
-                    }
-                    className="w-20 text-center"
-                    min={minQty}
-                  />
-                  <Button
-                    variant="outline"
-                    size="icon"
-                    className="h-9 w-9"
-                    onClick={() => setQuantity(quantity + 1)}
-                  >
-                    <Plus className="h-4 w-4" />
-                  </Button>
-                  <span className="text-sm text-muted-foreground">
-                    Min: {minQty}
-                  </span>
-                </div>
-              </div>
-
-              <div className="flex items-center justify-between py-2 bg-muted/50 rounded-lg px-3">
-                <span className="text-sm font-medium">Total</span>
-                <span className="text-lg font-bold">{formatCurrency(totalPrice)}</span>
-              </div>
-
-              <Button
-                className="w-full bg-emerald-600 hover:bg-emerald-700 h-11"
-                onClick={() => {
-                  if (user) {
-                    addToCart.mutate({
-                      productId: product.id,
-                      quantity,
-                    });
-                    return;
-                  }
-
-                  addGuestCartItem({
-                    id: product.id,
-                    productId: product.id,
-                    productSlug: product.slug,
-                    productName: product.name,
-                    productImage: product.image,
-                    productUnitType: product.unitType,
-                    productUnitSize: product.unitSize,
-                    quantity,
-                    unitPrice: product.unitPrice.toString(),
-                  });
-                  navigate("/cart");
-                }}
-                disabled={addToCart.isPending}
-              >
-                <ShoppingCart className="mr-2 h-4 w-4" />
-                {addToCart.isPending ? "Adding..." : "Add to Cart"}
+          <div className="flex flex-wrap items-baseline gap-3">
+            <span className="text-3xl font-semibold text-emerald-700">{formatCurrency(price)}</span>
+            <span className="text-sm text-muted-foreground">/ {unitLabels[unit] ?? unit}</span>
+            {compareAt > 0 && <span className="text-lg text-muted-foreground line-through">{formatCurrency(compareAt)}</span>}
+            <Badge>{discount}% OFF</Badge>
+          </div>
+          <div className="grid gap-2 text-sm text-muted-foreground sm:grid-cols-2">
+            <p>Stock : {product.stock ?? "Backend"} {unit}</p>
+            <p>MOQ : {minQty} {unit}</p>
+            <p>Origin: {product.origin ?? "Himachal Pradesh"}</p>
+            <p>Delivery: {product.delivery ?? "Tomorrow"}</p>
+          </div>
+          <div className="space-y-2">
+            <p className="text-sm font-medium">Quantity</p>
+            <div className="flex items-center gap-3">
+              <Button variant="outline" size="icon" onClick={() => setQuantity(Math.max(minQty, quantity - 1))} disabled={quantity <= minQty}>
+                <Minus className="h-4 w-4" />
               </Button>
-            </CardContent>
-          </Card>
-
-          {/* Details Grid */}
-          <div className="grid grid-cols-2 gap-3">
-            {[
-              { icon: MapPin, label: "Origin", value: product.origin },
-              { icon: Calendar, label: "Season", value: product.season },
-              { icon: Package, label: "Unit Size", value: product.unitSize },
-              { icon: Award, label: "Grade", value: gradeLabels[product.grade] },
-            ].map((item) => (
-              <div key={item.label} className="flex items-start gap-2 p-3 rounded-lg bg-muted/50">
-                <item.icon className="h-4 w-4 text-muted-foreground mt-0.5 shrink-0" />
-                <div>
-                  <p className="text-xs text-muted-foreground">{item.label}</p>
-                  <p className="text-sm font-medium">{item.value ?? "N/A"}</p>
-                </div>
-              </div>
-            ))}
-          </div>
-
-          {/* Certifications */}
-          {certifications.length > 0 && (
-            <div>
-              <p className="text-sm font-medium mb-2">Certifications</p>
-              <div className="flex flex-wrap gap-2">
-                {certifications.map((cert: string) => (
-                  <Badge key={cert} variant="outline" className="text-xs">
-                    <Check className="mr-1 h-3 w-3 text-emerald-500" />
-                    {cert}
-                  </Badge>
-                ))}
-              </div>
+              <span className="min-w-20 text-center font-medium">{quantity} {unit}</span>
+              <Button variant="outline" size="icon" onClick={() => setQuantity(quantity + 1)}>
+                <Plus className="h-4 w-4" />
+              </Button>
             </div>
-          )}
+          </div>
+          <p className="text-lg font-semibold">Total : {formatCurrency(price * quantity)}</p>
+          <div className="grid gap-3 md:grid-cols-2">
+            <Button variant="outline" className="h-12" onClick={() => addProduct()}>
+              <ShoppingCart className="mr-2 h-4 w-4" />
+              Add & Continue Shopping
+            </Button>
+            <Button className="h-12 bg-emerald-600 hover:bg-emerald-700" onClick={() => addProduct("/checkout")}>
+              <Zap className="mr-2 h-4 w-4" />
+              Buy Now
+            </Button>
+            <Button className="h-12 md:col-span-2" onClick={() => addProduct("/cart")} disabled={addToCart.isPending}>
+              <Check className="mr-2 h-4 w-4" />
+              Add to Cart & Go to Cart
+            </Button>
+          </div>
         </div>
-      </div>
+      </section>
+
+      <DetailSection title="Product Description">
+        {product.description ?? "Fresh premium products harvested and packed for wholesale buyers."}
+      </DetailSection>
+      <DetailSection title="Supplier Information">
+        <div className="grid gap-2 text-sm sm:grid-cols-2">
+          <p>Supplier Name: {product.supplierName ?? product.supplier ?? "Fresh Farms"}</p>
+          <p>Address: Backend placeholder</p>
+          <p>Rating: {product.rating ?? "4.8"}</p>
+          <p>Contact: Backend placeholder</p>
+        </div>
+      </DetailSection>
+      <DetailSection title="Related Products">
+        <div className="flex flex-wrap gap-2">
+          {related.map((item) => (
+            <Link key={item.slug} to={`/products/${item.slug}`} className="rounded-md border px-3 py-2 text-sm hover:bg-muted">
+              {item.icon} {item.name}
+            </Link>
+          ))}
+        </div>
+      </DetailSection>
     </div>
+  );
+}
+
+function DetailSection({ title, children }: { title: string; children: React.ReactNode }) {
+  return (
+    <Card>
+      <CardContent className="space-y-3 p-5">
+        <h2 className="font-semibold">{title}</h2>
+        <div className="text-sm text-muted-foreground">{children}</div>
+      </CardContent>
+    </Card>
   );
 }
