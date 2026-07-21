@@ -38,6 +38,8 @@ app/
 
 The frontend is a React 19 + TypeScript + Vite application using React Router for route composition. `src/App.tsx` defines public routes, authenticated routes, and owner-only routes.
 
+`src/pages/LandingPage.tsx` is the public `/` route. It now acts as a product-first B2B wholesale marketplace homepage instead of a marketing landing page. It uses public `product.list` and `category.list` tRPC queries for browsing, search, category filtering, featured products, category cards, and recently added products. Visitors can browse and open product details without a session, while homepage Add To Cart redirects guests to login and uses the authenticated cart mutation only after login.
+
 `src/components/AppLayout.tsx` is the authenticated shell. It renders a role-aware sidebar and top bar:
 
 - Business owner and platform admin see ERP navigation for dashboard, product catalog, categories, inventory, orders, reports, settings, and profile.
@@ -57,7 +59,9 @@ Product image rendering uses fallback placeholders on list, dashboard, detail, a
 
 ## Backend Architecture
 
-The backend is a Hono server with tRPC routers. It uses Drizzle ORM against MySQL/TiDB Cloud. The server entry is bundled from `api/boot.ts`; `api/router.ts` aggregates domain routers.
+
+
+The backend is a Hono server with tRPC routers. It uses Drizzle ORM against PostgreSQL (Neon). The server entry is bundled from `api/boot.ts`; `api/router.ts` aggregates domain routers.
 
 Backend query functions live in `api/queries/` and keep database access separate from router input validation and authorization. Routers validate input with Zod and call query helpers for persistence.
 
@@ -144,9 +148,9 @@ Owner workflow:
 
 Buyer workflow:
 
-1. Sign in or browse product catalog.
-2. Use the marketplace dashboard to search, browse categories, and review recommendations.
-3. Add products to cart or request a quote.
+1. Browse the public marketplace homepage or product catalog without signing in.
+2. Search products, filter by categories, and open product detail pages before authentication.
+3. Sign in when adding products to cart, checking out, viewing orders, or entering the dashboard.
 4. Checkout converts cart items to a purchase order.
 5. Track purchase orders, invoices, and delivery status from buyer workspace pages.
 
@@ -189,7 +193,7 @@ Buyers must never see administrative controls. The UI hides add/edit/delete prod
 | Styling | Tailwind CSS, shadcn/ui-style components, lucide-react icons |
 | Data Fetching | tRPC React + TanStack Query |
 | Backend | Hono, tRPC 11 |
-| Database | MySQL/TiDB Cloud with Drizzle ORM |
+| Database | PostgreSQL (Neon) with Drizzle ORM|
 | Auth | Local password, mobile OTP, JWT cookies |
 | Validation | Zod |
 | Build | Vite + esbuild |
@@ -204,6 +208,7 @@ Buyers must never see administrative controls. The UI hides add/edit/delete prod
 - Centralized owner helper.
 - Owner-only route and API protection for ERP functions.
 - Product list/detail.
+- Product-first public homepage for browsing active wholesale products before authentication.
 - Product create with inventory creation.
 - Product edit screen for owner catalog maintenance.
 - Product archive mutation.

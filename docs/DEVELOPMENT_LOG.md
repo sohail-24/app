@@ -1,5 +1,49 @@
 # FreshFlow Development Log
 
+## 2026-07-21 Home Marketplace V2
+
+### Summary
+
+Replaced the public marketing landing page with a product-first B2B wholesale marketplace homepage. The new `/` experience prioritizes product browsing, search, category filtering, MOQ visibility, stock visibility, supplier context, quantity selection, and live wholesale totals before asking visitors to authenticate.
+
+### Reason for Redesign
+
+FreshFlow needs to feel like a wholesale procurement marketplace similar in intent to IndiaMART, Udaan, and Amazon Business, not a fashion ecommerce or oversized SaaS landing page. The homepage now encourages browsing first and gates only cart actions behind login.
+
+### Files Modified
+
+- `src/pages/LandingPage.tsx`
+- `docs/UI/HomeMarketplaceV2.md`
+- `docs/DEVELOPMENT_LOG.md`
+- `docs/ARCHITECTURE.md`
+
+### Features Completed
+
+- Added a sticky public marketplace header with FreshFlow branding, large search, login/profile, and cart entry points.
+- Added a backend-driven horizontal category bar with mobile scrolling.
+- Removed the oversized marketing hero and replaced it with a compact business information strip.
+- Added featured wholesale product cards backed by `trpc.product.list`.
+- Added live quantity selectors and total price calculations on product cards.
+- Added backend category cards from `trpc.category.list`.
+- Added recently added products with load-more behavior.
+- Added login-gated Add To Cart behavior on the public homepage using the existing `trpc.cart.add` mutation for authenticated users.
+
+### UI Improvements
+
+- Shifted the first viewport from marketing copy to product discovery.
+- Kept wholesale details visible: price, MOQ, stock, supplier, category, rating, and total.
+- Improved mobile responsiveness with stacked header rows, scrollable categories, wrapping filters, and single-column product cards.
+- Preserved a clean, minimal B2B visual language with neutral surfaces and emerald primary actions.
+
+### Backend Changes
+
+None.
+
+### Verification
+
+- `npm run check` passed.
+- `npm run build` passed.
+
 ## 2026-07-17
 
 ### Summary
