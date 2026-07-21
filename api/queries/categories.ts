@@ -22,7 +22,10 @@ export async function findCategoryById(id: number) {
 }
 
 export async function createCategory(data: InsertCategory) {
-  const result = await getDb().insert(categories).values(data).$returningId();
+  const result = await getDb()
+    .insert(categories)
+    .values(data)
+    .returning({ id: categories.id });
   return result[0].id;
 }
 

@@ -145,7 +145,10 @@ export async function createOrder(data: {
   buyerNotes?: string;
 }) {
   const db = getDb();
-  const result = await db.insert(orders).values(data).$returningId();
+  const result = await db
+    .insert(orders)
+    .values(data)
+    .returning({ id: orders.id });
   return result[0].id;
 }
 

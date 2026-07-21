@@ -90,7 +90,10 @@ export async function updateInventory(
 }
 
 export async function createInventoryRecord(data: InsertInventory) {
-  const result = await getDb().insert(inventory).values(data).$returningId();
+  const result = await getDb()
+    .insert(inventory)
+    .values(data)
+    .returning({ id: inventory.id });
   return result[0].id;
 }
 

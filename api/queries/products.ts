@@ -177,7 +177,10 @@ export async function createProductWithInventory(input: {
 }) {
   const db = getDb();
   return db.transaction(async (tx) => {
-    const productResult = await tx.insert(products).values(input.product).$returningId();
+    const productResult = await tx
+      .insert(products)
+      .values(input.product)
+      .returning({ id: products.id });
     const productId = productResult[0].id;
     const quantityOnHand = input.inventory.quantityOnHand;
     const reorderLevel = input.inventory.reorderLevel;

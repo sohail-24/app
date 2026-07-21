@@ -58,7 +58,10 @@ export async function addToCart(data: {
     return { id: existing[0].id, quantity: newQuantity, updated: true };
   }
 
-  const result = await db.insert(cartItems).values(data).$returningId();
+  const result = await db
+    .insert(cartItems)
+    .values(data)
+    .returning({ id: cartItems.id });
   return { id: result[0].id, quantity: data.quantity, updated: false };
 }
 

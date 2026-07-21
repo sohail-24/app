@@ -1,26 +1,87 @@
 import {
-  mysqlTable,
-  serial,
+  pgTable,
+  bigserial,
   varchar,
   text,
   timestamp,
-  decimal,
-  int,
+  numeric,
+  integer,
   bigint,
-  mysqlEnum,
+  pgEnum,
   index,
   boolean,
-} from "drizzle-orm/mysql-core";
+} from "drizzle-orm/pg-core";
+
+export const authProviderEnum = pgEnum("authProvider", ["local", "mobile"]);
+export const userRoleEnum = pgEnum("role", ["user", "admin"]);
+export const companyTypeEnum = pgEnum("company_type", [
+  "supplier",
+  "buyer",
+  "both",
+]);
+export const paymentTermsEnum = pgEnum("paymentTerms", [
+  "net_15",
+  "net_30",
+  "net_45",
+  "net_60",
+  "cod",
+  "prepaid",
+]);
+export const unitTypeEnum = pgEnum("unitType", [
+  "kg",
+  "lb",
+  "case",
+  "pallet",
+  "each",
+  "bunch",
+  "box",
+  "bag",
+]);
+export const productGradeEnum = pgEnum("grade", [
+  "premium",
+  "grade_a",
+  "grade_b",
+  "standard",
+]);
+export const productStatusEnum = pgEnum("product_status", [
+  "draft",
+  "active",
+  "archived",
+]);
+export const orderStatusEnum = pgEnum("order_status", [
+  "pending",
+  "confirmed",
+  "processing",
+  "shipped",
+  "delivered",
+  "cancelled",
+  "refunded",
+  "disputed",
+]);
+export const paymentStatusEnum = pgEnum("paymentStatus", [
+  "pending",
+  "authorized",
+  "paid",
+  "partially_paid",
+  "refunded",
+  "failed",
+]);
+export const inventoryStatusEnum = pgEnum("inventory_status", [
+  "in_stock",
+  "low_stock",
+  "out_of_stock",
+]);
+export const otpPurposeEnum = pgEnum("purpose", ["login"]);
 
 // ─────────────────────────────────────────────────────────────
 // USERS — Extended from auth with company association
 // ─────────────────────────────────────────────────────────────
-export const users = mysqlTable(
+export const users = pgTable(
   "users",
   {
-    id: serial("id").primaryKey(),
+    id: bigserial("id", { mode: "number" }).primaryKey(),
     unionId: varchar("unionId", { length: 255 }).notNull().unique(),
-    authProvider: mysqlEnum("authProvider", ["local", "mobile"])
+    authProvider: authProviderEnum("authProvider")
       .default("local")
       .notNull(),
     name: varchar("name", { length: 255 }),
@@ -28,9 +89,9 @@ export const users = mysqlTable(
     passwordHash: text("passwordHash"),
     refreshTokenHash: text("refreshTokenHash"),
     avatar: text("avatar"),
-    role: mysqlEnum("role", ["user", "admin"]).default("user").notNull(),
+    role: userRoleEnum("role").default("user").notNull(),
     // B2B: each user belongs to a company
-    companyId: bigint("companyId", { mode: "number", unsigned: true }),
+    companyId: bigint("companyId", { mode: "number" }),
     phone: varchar("phone", { length: 50 }),
     mobileVerifiedAt: timestamp("mobileVerifiedAt"),
     emailVerifiedAt: timestamp("emailVerifiedAt"),
@@ -56,13 +117,13 @@ export type InsertUser = typeof users.$inferInsert;
 // ─────────────────────────────────────────────────────────────
 // OTP VERIFICATIONS — Pluggable mobile login verification
 // ─────────────────────────────────────────────────────────────
-export const otpVerifications = mysqlTable(
+export const otpVerifications = pgTable(
   "otp_verifications",
   {
-    id: serial("id").primaryKey(),
+    id: bigserial("id", { mode: "number" }).primaryKey(),
     mobileNumber: varchar("mobileNumber", { length: 20 }).notNull(),
     codeHash: text("codeHash").notNull(),
-    purpose: mysqlEnum("purpose", ["login"]).default("login").notNull(),
+    purpose: otpPurposeEnum("purpose").default("login").notNull(),
     expiresAt: timestamp("expiresAt").notNull(),
     consumedAt: timestamp("consumedAt"),
     createdAt: timestamp("createdAt").defaultNow().notNull(),
@@ -79,13 +140,13 @@ export type InsertOtpVerification = typeof otpVerifications.$inferInsert;
 // ─────────────────────────────────────────────────────────────
 // COMPANIES — B2B entities (buyers, suppliers, or both)
 // ─────────────────────────────────────────────────────────────
-export const companies = mysqlTable(
+export const companies = pgTable(
   "companies",
   {
-    id: serial("id").primaryKey(),
+    id: bigserial("id", { mode: "number" }).primaryKey(),
     name: varchar("name", { length: 255 }).notNull(),
     slug: varchar("slug", { length: 255 }).notNull().unique(),
-    type: mysqlEnum("type", ["supplier", "buyer", "both"])
+    type: companyTypeEnum("type")
       .default("buyer")
       .notNull(),
     description: text("description"),
@@ -107,18 +168,11 @@ export const companies = mysqlTable(
     isVerified: boolean("isVerified").default(false).notNull(),
     isActive: boolean("isActive").default(true).notNull(),
     // Wholesale-specific
-    minimumOrderAmount: decimal("minimumOrderAmount", {
+    minimumOrderAmount: numeric("minimumOrderAmount", {
       precision: 12,
       scale: 2,
     }).default("0.00"),
-    paymentTerms: mysqlEnum("paymentTerms", [
-      "net_15",
-      "net_30",
-      "net_45",
-      "net_60",
-      "cod",
-      "prepaid",
-    ]).default("net_30"),
+    paymentTerms: paymentTermsEnum("paymentTerms").default("net_30"),
     createdAt: timestamp("createdAt").defaultNow().notNull(),
     updatedAt: timestamp("updatedAt")
       .defaultNow()
@@ -138,17 +192,17 @@ export type InsertCompany = typeof companies.$inferInsert;
 // ─────────────────────────────────────────────────────────────
 // CATEGORIES — Product categories for fruits
 // ─────────────────────────────────────────────────────────────
-export const categories = mysqlTable(
+export const categories = pgTable(
   "categories",
   {
-    id: serial("id").primaryKey(),
+    id: bigserial("id", { mode: "number" }).primaryKey(),
     name: varchar("name", { length: 100 }).notNull().unique(),
     slug: varchar("slug", { length: 100 }).notNull().unique(),
     description: text("description"),
     icon: varchar("icon", { length: 50 }),
     color: varchar("color", { length: 7 }), // hex color for UI
-    parentId: bigint("parentId", { mode: "number", unsigned: true }),
-    sortOrder: int("sortOrder").default(0).notNull(),
+    parentId: bigint("parentId", { mode: "number" }),
+    sortOrder: integer("sortOrder").default(0).notNull(),
     isActive: boolean("isActive").default(true).notNull(),
     createdAt: timestamp("createdAt").defaultNow().notNull(),
     updatedAt: timestamp("updatedAt")
@@ -169,58 +223,43 @@ export type InsertCategory = typeof categories.$inferInsert;
 // ─────────────────────────────────────────────────────────────
 // PRODUCTS — Wholesale fruit products
 // ─────────────────────────────────────────────────────────────
-export const products = mysqlTable(
+export const products = pgTable(
   "products",
   {
-    id: serial("id").primaryKey(),
+    id: bigserial("id", { mode: "number" }).primaryKey(),
     name: varchar("name", { length: 255 }).notNull(),
     slug: varchar("slug", { length: 255 }).notNull(),
     description: text("description"),
     shortDescription: varchar("shortDescription", { length: 500 }),
     // Category
-    categoryId: bigint("categoryId", {
-      mode: "number",
-      unsigned: true,
-    }).notNull(),
+    categoryId: bigint("categoryId", { mode: "number" }).notNull(),
     // Supplier (the company selling this product)
-    supplierId: bigint("supplierId", {
-      mode: "number",
-      unsigned: true,
-    }).notNull(),
+    supplierId: bigint("supplierId", { mode: "number" }).notNull(),
     // Pricing (wholesale)
-    unitPrice: decimal("unitPrice", { precision: 12, scale: 2 }).notNull(),
-    compareAtPrice: decimal("compareAtPrice", {
+    unitPrice: numeric("unitPrice", { precision: 12, scale: 2 }).notNull(),
+    compareAtPrice: numeric("compareAtPrice", {
       precision: 12,
       scale: 2,
     }).default("0.00"),
     currency: varchar("currency", { length: 3 }).default("USD").notNull(),
     // Unit of measure
-    unitType: mysqlEnum("unitType", [
-      "kg",
-      "lb",
-      "case",
-      "pallet",
-      "each",
-      "bunch",
-      "box",
-      "bag",
-    ]).notNull(),
+    unitType: unitTypeEnum("unitType").notNull(),
     unitSize: varchar("unitSize", { length: 50 }),
     // Quantity
-    minimumOrderQuantity: int("minimumOrderQuantity").default(1).notNull(),
+    minimumOrderQuantity: integer("minimumOrderQuantity").default(1).notNull(),
     // Media
     image: text("image"),
     images: text("images"), // JSON array of image URLs
     // Details
     origin: varchar("origin", { length: 100 }),
     season: varchar("season", { length: 100 }),
-    grade: mysqlEnum("grade", ["premium", "grade_a", "grade_b", "standard"])
+    grade: productGradeEnum("grade")
       .default("grade_a")
       .notNull(),
     organic: boolean("organic").default(false).notNull(),
     certifications: text("certifications"), // JSON array
     // Status
-    status: mysqlEnum("status", ["draft", "active", "archived"])
+    status: productStatusEnum("status")
       .default("draft")
       .notNull(),
     // SEO
@@ -251,17 +290,14 @@ export type InsertProduct = typeof products.$inferInsert;
 // ─────────────────────────────────────────────────────────────
 // CART ITEMS — Shopping cart
 // ─────────────────────────────────────────────────────────────
-export const cartItems = mysqlTable(
+export const cartItems = pgTable(
   "cart_items",
   {
-    id: serial("id").primaryKey(),
-    userId: bigint("userId", { mode: "number", unsigned: true }).notNull(),
-    productId: bigint("productId", {
-      mode: "number",
-      unsigned: true,
-    }).notNull(),
-    quantity: int("quantity").notNull(),
-    unitPrice: decimal("unitPrice", { precision: 12, scale: 2 }).notNull(),
+    id: bigserial("id", { mode: "number" }).primaryKey(),
+    userId: bigint("userId", { mode: "number" }).notNull(),
+    productId: bigint("productId", { mode: "number" }).notNull(),
+    quantity: integer("quantity").notNull(),
+    unitPrice: numeric("unitPrice", { precision: 12, scale: 2 }).notNull(),
     notes: varchar("notes", { length: 500 }),
     createdAt: timestamp("createdAt").defaultNow().notNull(),
     updatedAt: timestamp("updatedAt")
@@ -285,58 +321,36 @@ export type InsertCartItem = typeof cartItems.$inferInsert;
 // ─────────────────────────────────────────────────────────────
 // ORDERS — Purchase orders
 // ─────────────────────────────────────────────────────────────
-export const orders = mysqlTable(
+export const orders = pgTable(
   "orders",
   {
-    id: serial("id").primaryKey(),
+    id: bigserial("id", { mode: "number" }).primaryKey(),
     orderNumber: varchar("orderNumber", { length: 50 }).notNull().unique(),
     // Parties
-    buyerId: bigint("buyerId", { mode: "number", unsigned: true }).notNull(),
-    supplierId: bigint("supplierId", {
-      mode: "number",
-      unsigned: true,
-    }).notNull(),
-    placedByUserId: bigint("placedByUserId", {
-      mode: "number",
-      unsigned: true,
-    }).notNull(),
+    buyerId: bigint("buyerId", { mode: "number" }).notNull(),
+    supplierId: bigint("supplierId", { mode: "number" }).notNull(),
+    placedByUserId: bigint("placedByUserId", { mode: "number" }).notNull(),
     // Financial
-    subtotal: decimal("subtotal", { precision: 12, scale: 2 }).notNull(),
-    taxAmount: decimal("taxAmount", {
+    subtotal: numeric("subtotal", { precision: 12, scale: 2 }).notNull(),
+    taxAmount: numeric("taxAmount", {
       precision: 12,
       scale: 2,
     }).default("0.00"),
-    shippingAmount: decimal("shippingAmount", {
+    shippingAmount: numeric("shippingAmount", {
       precision: 12,
       scale: 2,
     }).default("0.00"),
-    discountAmount: decimal("discountAmount", {
+    discountAmount: numeric("discountAmount", {
       precision: 12,
       scale: 2,
     }).default("0.00"),
-    totalAmount: decimal("totalAmount", { precision: 12, scale: 2 }).notNull(),
+    totalAmount: numeric("totalAmount", { precision: 12, scale: 2 }).notNull(),
     currency: varchar("currency", { length: 3 }).default("USD").notNull(),
     // Status workflow
-    status: mysqlEnum("status", [
-      "pending",
-      "confirmed",
-      "processing",
-      "shipped",
-      "delivered",
-      "cancelled",
-      "refunded",
-      "disputed",
-    ])
+    status: orderStatusEnum("status")
       .default("pending")
       .notNull(),
-    paymentStatus: mysqlEnum("paymentStatus", [
-      "pending",
-      "authorized",
-      "paid",
-      "partially_paid",
-      "refunded",
-      "failed",
-    ])
+    paymentStatus: paymentStatusEnum("paymentStatus")
       .default("pending")
       .notNull(),
     // Shipping
@@ -383,30 +397,18 @@ export type InsertOrder = typeof orders.$inferInsert;
 // ─────────────────────────────────────────────────────────────
 // ORDER ITEMS — Line items within orders
 // ─────────────────────────────────────────────────────────────
-export const orderItems = mysqlTable(
+export const orderItems = pgTable(
   "order_items",
   {
-    id: serial("id").primaryKey(),
-    orderId: bigint("orderId", { mode: "number", unsigned: true }).notNull(),
-    productId: bigint("productId", {
-      mode: "number",
-      unsigned: true,
-    }).notNull(),
+    id: bigserial("id", { mode: "number" }).primaryKey(),
+    orderId: bigint("orderId", { mode: "number" }).notNull(),
+    productId: bigint("productId", { mode: "number" }).notNull(),
     productName: varchar("productName", { length: 255 }).notNull(),
     productImage: text("productImage"),
-    quantity: int("quantity").notNull(),
-    unitPrice: decimal("unitPrice", { precision: 12, scale: 2 }).notNull(),
-    totalPrice: decimal("totalPrice", { precision: 12, scale: 2 }).notNull(),
-    unitType: mysqlEnum("unitType", [
-      "kg",
-      "lb",
-      "case",
-      "pallet",
-      "each",
-      "bunch",
-      "box",
-      "bag",
-    ]).notNull(),
+    quantity: integer("quantity").notNull(),
+    unitPrice: numeric("unitPrice", { precision: 12, scale: 2 }).notNull(),
+    totalPrice: numeric("totalPrice", { precision: 12, scale: 2 }).notNull(),
+    unitType: unitTypeEnum("unitType").notNull(),
     notes: varchar("notes", { length: 500 }),
     createdAt: timestamp("createdAt").defaultNow().notNull(),
   },
@@ -422,24 +424,18 @@ export type InsertOrderItem = typeof orderItems.$inferInsert;
 // ─────────────────────────────────────────────────────────────
 // INVENTORY — Stock tracking per product per supplier
 // ─────────────────────────────────────────────────────────────
-export const inventory = mysqlTable(
+export const inventory = pgTable(
   "inventory",
   {
-    id: serial("id").primaryKey(),
-    productId: bigint("productId", {
-      mode: "number",
-      unsigned: true,
-    }).notNull(),
-    supplierId: bigint("supplierId", {
-      mode: "number",
-      unsigned: true,
-    }).notNull(),
+    id: bigserial("id", { mode: "number" }).primaryKey(),
+    productId: bigint("productId", { mode: "number" }).notNull(),
+    supplierId: bigint("supplierId", { mode: "number" }).notNull(),
     // Stock levels
-    quantityOnHand: int("quantityOnHand").default(0).notNull(),
-    quantityReserved: int("quantityReserved").default(0).notNull(),
-    quantityAvailable: int("quantityAvailable").default(0).notNull(),
-    reorderLevel: int("reorderLevel").default(10).notNull(),
-    reorderQuantity: int("reorderQuantity").default(100).notNull(),
+    quantityOnHand: integer("quantityOnHand").default(0).notNull(),
+    quantityReserved: integer("quantityReserved").default(0).notNull(),
+    quantityAvailable: integer("quantityAvailable").default(0).notNull(),
+    reorderLevel: integer("reorderLevel").default(10).notNull(),
+    reorderQuantity: integer("reorderQuantity").default(100).notNull(),
     // Location
     warehouseLocation: varchar("warehouseLocation", { length: 100 }),
     batchNumber: varchar("batchNumber", { length: 100 }),
@@ -448,7 +444,7 @@ export const inventory = mysqlTable(
     receivedDate: timestamp("receivedDate"),
     lastCountedAt: timestamp("lastCountedAt"),
     // Status
-    status: mysqlEnum("status", ["in_stock", "low_stock", "out_of_stock"])
+    status: inventoryStatusEnum("status")
       .default("in_stock")
       .notNull(),
     notes: text("notes"),

@@ -71,7 +71,7 @@ async function createCompany(input: { name: string; type: "buyer" | "supplier" |
       isVerified: false,
       isActive: true,
     })
-    .$returningId();
+    .returning({ id: companies.id });
 
   return result[0].id;
 }
@@ -105,7 +105,7 @@ async function createUser(input: {
       isActive: true,
       lastSignInAt: new Date(),
     })
-    .$returningId();
+    .returning({ id: users.id });
 
   const user = await findUserById(result[0].id);
   if (!user) {
