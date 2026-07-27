@@ -1,4 +1,4 @@
-# FreshFlow Authentication
+# FreshFlow Authentication & Authorization
 
 Version: 1.0
 
@@ -7,6 +7,13 @@ Status: Stable (MVP)
 Last Updated: July 2026
 
 ---
+# Purpose
+
+This document defines the authentication and authorization standards used throughout the FreshFlow project.
+
+It describes how users authenticate, how sessions are managed, how permissions are enforced, and how future security features will be integrated.
+
+Business modules should reference this document instead of defining authentication behaviour independently.
 
 # Overview
 
@@ -369,7 +376,7 @@ Future
 
 ---
 
-# API Endpoints
+# Authentication Router
 
 Authentication Router
 
@@ -466,6 +473,15 @@ Reason
 The current authentication system is sufficient for MVP development.
 
 Additional security workflows will be implemented before production launch or when the platform begins serving real users.
+
+---
+# Authorization Rules
+
+Business modules must never implement their own authentication.
+
+Authentication and authorization are centralized.
+
+Every protected operation must verify authentication before applying business-specific permission rules.
 
 ---
 

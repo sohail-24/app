@@ -1,16 +1,16 @@
 # Company Decisions
 
-Version: 1.0
+**Version:** 1.1
 
-Status: Approved Design
+**Status:** Approved Design
 
-Module: Company
+**Module:** Company
 
 ---
 
 # Purpose
 
-This document records the architectural, business, user experience, security, database, and API decisions made for the Company module.
+This document records the architectural, business, user experience, security, database, API, and operational decisions made for the Company module.
 
 It serves as the reasoning behind the design choices and helps maintain consistency throughout future development.
 
@@ -24,6 +24,7 @@ The Company module follows these principles:
 * Collect only essential business information.
 * Minimize required fields.
 * Prioritize usability over complexity.
+* Centralize business configuration.
 * Support future expansion without redesign.
 * Maintain consistency with other FreshFlow modules.
 
@@ -39,7 +40,7 @@ The Company module represents a single business entity.
 
 ### Reason
 
-Version 1.0 targets individual businesses. Supporting one company keeps the data model simple and reduces onboarding complexity.
+Version 1.1 targets individual businesses. Supporting one company keeps the data model simple and reduces onboarding complexity.
 
 ---
 
@@ -49,17 +50,27 @@ The Company module is independent from operational modules.
 
 ### Reason
 
-Products, Inventory, Orders, Warehouse, Invoices, and Reports consume company information but do not manage it.
+Products, Inventory, Warehouse, Orders, Invoices, and Reports consume company information but do not manage it.
 
 ---
 
 ## Decision
 
-Company information is managed from one central location.
+Company information and business settings are managed from one central location.
 
 ### Reason
 
-A single source of truth prevents duplicate business information across the application.
+A single source of truth prevents duplicate configuration across the application.
+
+---
+
+## Decision
+
+Delivery Settings belong to the Company module.
+
+### Reason
+
+Delivery coverage is a business configuration, not an order feature. The Company module defines where the business operates, while the Orders module only validates whether an order can be placed.
 
 ---
 
@@ -107,17 +118,37 @@ Businesses should be able to start using the platform immediately without prepar
 
 ---
 
+## Decision
+
+Manage supported delivery states from Company Settings.
+
+### Reason
+
+Business owners should be able to enable or disable delivery areas without modifying the Orders module.
+
+---
+
 # Business Decisions
 
 ---
 
 ## Decision
 
-Support one company per business in Version 1.0.
+Support one company per business in Version 1.1.
 
 ### Reason
 
 FreshFlow is designed for small and medium-sized businesses. Multi-company support is unnecessary in the initial release.
+
+---
+
+## Decision
+
+Operate only in selected delivery states.
+
+### Reason
+
+FreshFlow follows a startup-first strategy. Restricting operations to supported states simplifies logistics, warehouse management, customer support, and delivery operations during the initial launch.
 
 ---
 
@@ -137,7 +168,7 @@ Do not require currency or timezone selection.
 
 ### Reason
 
-Version 1.0 targets businesses operating within the same city and region. Using sensible defaults avoids unnecessary setup.
+Version 1.1 targets businesses operating within limited geographical regions. Using sensible defaults avoids unnecessary setup.
 
 ---
 
@@ -161,7 +192,7 @@ Authentication is required for all Company operations.
 
 ### Reason
 
-Company information must only be accessible to authenticated users.
+Company information and delivery settings must only be accessible to authenticated users.
 
 ---
 
@@ -171,7 +202,7 @@ Authorization is enforced on the server.
 
 ### Reason
 
-Users may only manage company information they are authorized to access. Client-side restrictions alone are insufficient.
+Only authorized Business Owners may modify company information or delivery settings.
 
 ---
 
@@ -205,7 +236,17 @@ Store company information in a single `companies` table.
 
 ### Reason
 
-The data model is simple and sufficient for Version 1.0 requirements.
+The data model is simple and sufficient for Version 1.1 requirements.
+
+---
+
+## Decision
+
+Store supported delivery states with company configuration.
+
+### Reason
+
+Each company manages its own delivery coverage independently without requiring a separate business module.
 
 ---
 
@@ -215,7 +256,7 @@ Keep operational data outside the Company module.
 
 ### Reason
 
-Products, Orders, Inventory, Warehouse, and Invoices each maintain their own domain data while referencing the company.
+Products, Inventory, Warehouse, Orders, and Invoices each maintain their own domain data while referencing the company.
 
 ---
 
@@ -225,7 +266,7 @@ Products, Orders, Inventory, Warehouse, and Invoices each maintain their own dom
 
 ## Decision
 
-Provide dedicated APIs for company information and logo management.
+Provide dedicated APIs for company information, logo management, and delivery settings.
 
 ### Reason
 
@@ -259,6 +300,10 @@ The following capabilities are intentionally postponed:
 
 * Multi-company management
 * Multiple business locations
+* Delivery by City
+* Delivery by District
+* Delivery by PIN Code
+* Delivery charges by location
 * GST and tax information
 * Currency selection
 * Timezone selection
@@ -266,7 +311,7 @@ The following capabilities are intentionally postponed:
 * Business verification
 * Advanced branding options
 
-These features may be introduced in future versions without affecting Version 1.0.
+These features may be introduced in future versions without affecting Version 1.1.
 
 ---
 
@@ -278,13 +323,14 @@ The following topics will be evaluated in future releases:
 * Company ownership transfer
 * Company archival and restoration
 * Organization-level settings
-* Third-party integrations
+* Dynamic delivery zones
+* Third-party logistics integrations
 
 ---
 
 # Decision History
 
-## Version 1.0
+## Version 1.1
 
 Approved decisions:
 
@@ -292,6 +338,8 @@ Approved decisions:
 * One company per business.
 * Minimal required information.
 * Optional company logo and website.
-* Local-first product strategy.
-* Centralized company information management.
+* Local-first startup strategy.
+* Company-managed delivery settings.
+* Selected-state delivery support.
+* Centralized business configuration.
 * Consistent architecture with other FreshFlow modules.

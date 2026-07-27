@@ -24,12 +24,12 @@ The Company APIs follow these principles.
 
 * Authentication required for every request.
 * Authorization enforced on the server.
-* One company per business in Version 1.0.
+* One company per business in Version 1.1.
+* Company business settings are centrally managed by the Company module.
 * Partial updates are preferred.
 * Validate all input before saving.
 * Return only necessary data.
 * Maintain backward compatibility whenever possible.
-
 ---
 
 # Authentication
@@ -55,6 +55,7 @@ Authorization rules:
 * Only authorized users may update company information.
 * Only authorized users may upload a company logo.
 * Only authorized users may remove a company logo.
+* Only authorized users may manage delivery settings.
 
 The authenticated company context is resolved from the current session.
 
@@ -64,13 +65,17 @@ The authenticated company context is resolved from the current session.
 
 Version 1.0 provides the following APIs.
 
-| API                 | Purpose                             |
-| ------------------- | ----------------------------------- |
-| Get Company         | Retrieve company information        |
-| Create Company      | Create the initial company profile  |
-| Update Company      | Update editable company information |
-| Upload Company Logo | Upload or replace company logo      |
-| Delete Company Logo | Remove company logo                 |
+| API                      | Purpose                             |
+| ------------------------ | ----------------------------------- |
+| Get Company              | Retrieve company information        |
+| Create Company           | Create the initial company profile  |
+| Update Company           | Update editable company information |
+| Upload Company Logo      | Upload or replace company logo      |
+| Delete Company Logo      | Remove company logo                 |
+| Get Delivery Settings    | Retrieve supported delivery states  |
+| Update Delivery Settings | Update supported delivery states    |
+
+
 
 ---
 
@@ -111,6 +116,7 @@ Returns:
 * Postal Code
 * Created Date
 * Updated Date
+* Supported Delivery States
 
 ### Business Rules
 
@@ -150,6 +156,10 @@ Authorized users only.
 * State
 * Postal Code
 
+### Delivery Settings
+
+* At least one supported delivery state
+
 ### Optional Fields
 
 * Company Logo
@@ -164,12 +174,18 @@ Authorized users only.
 
 Returns the newly created company.
 
+Supported Delivery States
+
 ### Possible Errors
 
 * UNAUTHORIZED
 * COMPANY_ALREADY_EXISTS
 * VALIDATION_ERROR
 * INTERNAL_SERVER_ERROR
+
+### Delivery Settings
+
+* At least one supported delivery state
 
 ---
 
@@ -198,6 +214,7 @@ Authorized users only.
 * City
 * State
 * Postal Code
+* Supported Delivery States
 
 ### Business Rules
 
@@ -299,6 +316,75 @@ Returns the updated company profile.
 * INTERNAL_SERVER_ERROR
 
 ---
+API 6 — Get Delivery Settings
+Purpose
+
+Retrieve the company's configured delivery settings.
+
+Authentication
+
+Required
+
+Authorization
+
+Authorized users only.
+
+Response
+
+Returns:
+
+* Supported Delivery States
+* Active States
+* Disabled States
+
+Business Rules
+
+* Delivery settings belong to the Company module.
+* Orders consume these settings but cannot modify them.
+
+Possible Errors
+
+* UNAUTHORIZED
+* COMPANY_NOT_FOUND
+* INTERNAL_SERVER_ERROR
+
+API 7 — Update Delivery Settings
+
+Purpose
+
+Update supported delivery states.
+
+Authentication
+
+Required
+
+Authorization
+
+Business Owner only.
+
+Validation
+
+* At least one state must remain enabled.
+* Duplicate states are not allowed.
+* Only supported system states can be configured.
+
+Business Rules
+
+* Changes become active immediately.
+* Orders automatically use the updated configuration.
+
+Response
+
+Returns updated delivery settings.
+
+Possible Errors
+
+* UNAUTHORIZED
+* COMPANY_NOT_FOUND
+* INVALID_DELIVERY_CONFIGURATION
+* INTERNAL_SERVER_ERROR
+
+---
 
 # Validation Rules
 
@@ -312,6 +398,13 @@ Returns the updated company profile.
 * City is required.
 * State is required.
 * Postal Code is required.
+
+---
+## Delivery Settings
+
+* At least one supported delivery state is required.
+* Duplicate states are not allowed.
+* Only supported system states can be configured.
 
 ---
 
@@ -332,16 +425,18 @@ Returns the updated company profile.
 
 # Error Catalog
 
-| Error                  | Description                     |
-| ---------------------- | ------------------------------- |
-| UNAUTHORIZED           | Authentication required         |
-| FORBIDDEN              | Access denied                   |
-| COMPANY_NOT_FOUND      | Company profile does not exist  |
-| COMPANY_ALREADY_EXISTS | Company profile already created |
-| VALIDATION_ERROR       | Input validation failed         |
-| FILE_TOO_LARGE         | Logo exceeds maximum size       |
-| UNSUPPORTED_FILE_TYPE  | Invalid image format            |
-| INTERNAL_SERVER_ERROR  | Unexpected server error         |
+| Error                          | Description                          |
+| ----------------------         | -------------------------------      |
+| UNAUTHORIZED                   | Authentication required              |
+| FORBIDDEN                      | Access denied                        |
+| COMPANY_NOT_FOUND              | Company profile does not exist       |    
+| COMPANY_ALREADY_EXISTS         | Company profile already created      |
+| VALIDATION_ERROR               | Input validation failed              |
+| FILE_TOO_LARGE                 | Logo exceeds maximum size            |
+| UNSUPPORTED_FILE_TYPE          | Invalid image format                 |
+| INTERNAL_SERVER_ERROR          | Unexpected server error              |
+| DELIVERY_STATE_REQUIRED        | At least one delivery state required |
+| INVALID_DELIVERY_CONFIGURATION | Invalid delivery configuration       |
 
 ---
 
@@ -375,6 +470,7 @@ Security requirements include:
 * Input validation
 * Output sanitization
 * Secure logo upload validation
+* Delivery settings can only be modified by authorized users.
 
 Client-side validation is never considered a security boundary.
 
@@ -402,9 +498,10 @@ Current tables:
 
 Future tables:
 
-* company_settings
-* company_locations
-* company_branding
+company_settings
+company_delivery_settings
+company_locations
+company_branding
 
 ---
 
@@ -422,6 +519,10 @@ Planned APIs include:
 * Currency Settings
 * Timezone Settings
 * Language Preferences
+* Delivery Cities
+* Delivery Districts
+* Delivery PIN Codes
+* Delivery Charges
 
 ---
 
@@ -429,7 +530,7 @@ Planned APIs include:
 
 Current Version:
 
-**v1.0**
+**v1.1**
 
 Future versions should remain backward compatible whenever possible.
 

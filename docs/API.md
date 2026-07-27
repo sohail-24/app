@@ -1,80 +1,361 @@
-# FreshFlow API
+# FreshFlow API Standards
 
-FreshFlow exposes backend operations through tRPC at `/api/trpc`.
+**Version:** 1.0
 
-## Auth Router
+**Status:** Active
 
-All auth responses use HTTP-only cookies for session state.
+**Last Updated:** 2026-07-27
 
-### `auth.me`
+---
 
-Returns the current user or `null`.
+# Purpose
 
-### `auth.register`
+This document defines the official API standards for the FreshFlow project.
 
-Creates a business account and signs the user in.
+It does not document individual business module APIs.
 
-Input:
+Each business module is responsible for maintaining its own `API.md` document.
 
-```ts
-{
-  businessName: string;
-  ownerName: string;
-  mobileNumber: string; // +91 mobile number
-  email?: string;
-  password: string; // min 8 chars
-  businessType: "buyer" | "supplier" | "both";
-}
+This document serves as the project-wide API standard that every backend service and module must follow.
+
+---
+
+# API Philosophy
+
+FreshFlow follows these API principles:
+
+* Consistent API design.
+* Clear separation of business modules.
+* Predictable request and response patterns.
+* Secure by default.
+* Validation before business logic.
+* Authorization before data access.
+* Technology-independent documentation where possible.
+
+---
+
+# API Architecture
+
+FreshFlow exposes backend functionality through **tRPC**.
+
+Business logic is organised into independent routers.
+
+Typical router structure:
+
+```text
+auth
+company
+category
+product
+inventory
+warehouse
+order
+invoice
+report
+userProfile
 ```
 
-### `auth.loginEmail`
+Each router owns its own business operations.
 
-Signs in with email and password.
+---
 
-Input:
+# Module Ownership
 
-```ts
-{
-  email: string;
-  password: string;
-}
+Each business module maintains its own API documentation.
+
+Example:
+
+```text
+docs/UI/company/API.md
+docs/UI/products/API.md
+docs/UI/categories/API.md
+docs/UI/inventory/API.md
+docs/UI/warehouse/API.md
+docs/UI/orders/API.md
+docs/UI/invoices/API.md
+docs/UI/reports/API.md
 ```
 
-### `auth.requestMobileOtp`
+Project-level API standards belong only in this document.
 
-Creates and sends an OTP challenge.
+Business-specific endpoints belong inside the corresponding module.
 
-Input:
+---
 
-```ts
-{
-  mobileNumber: string; // +91 mobile number
-}
+# API Design Principles
+
+All APIs should follow these principles:
+
+* Single responsibility.
+* Clear naming.
+* Predictable behaviour.
+* Business-focused operations.
+* Consistent validation.
+* Consistent error handling.
+* Reusable request models.
+* Reusable response models.
+
+---
+
+# Naming Standards
+
+Router names use singular nouns.
+
+Examples:
+
+```text
+auth
+company
+category
+product
+inventory
+warehouse
+order
+invoice
+report
 ```
 
-Development responses include `devCode` when the mock provider is active.
+Procedure names use verbs that describe the operation.
 
-### `auth.verifyMobileOtp`
+Examples:
 
-Verifies OTP and creates or logs in the mobile account.
-
-Input:
-
-```ts
-{
-  mobileNumber: string;
-  otp: string; // 6 digits
-}
+```text
+list
+get
+create
+update
+delete
+archive
+search
+stats
+count
 ```
 
-### `auth.refresh`
+Avoid unclear names such as:
 
-Rotates session cookies when a valid refresh cookie is present.
+```text
+process
+handle
+execute
+doSomething
+```
 
-### `auth.logout`
+---
 
-Clears access and refresh cookies and removes the stored refresh token hash.
+# Authentication
 
-## Route Protection
+Authentication is required for protected APIs.
 
-Public product browsing, search, product details, adding to cart, and cart viewing do not require authentication. Checkout, orders, profile, dashboard, inventory, reports, and settings require a valid session.
+Supported authentication methods are documented in:
+
+```text
+docs/AUTHENTICATION.md
+```
+
+Authentication should be completed before any protected business operation.
+
+---
+
+# Authorization
+
+Authorization must be enforced on the server.
+
+Permissions must never rely solely on the frontend.
+
+Business rules determine who can perform each operation.
+
+Future role expansion should not require API redesign.
+
+---
+
+# Validation
+
+All API inputs must be validated before business logic executes.
+
+Validation should include:
+
+* Required fields
+* Data types
+* Length limits
+* Numeric ranges
+* Business rules
+* Enum validation
+* Format validation
+
+Invalid requests must return meaningful validation errors.
+
+---
+
+# Error Handling
+
+APIs should return clear and consistent errors.
+
+Typical error categories include:
+
+* Validation Error
+* Authentication Error
+* Authorization Error
+* Not Found
+* Conflict
+* Business Rule Violation
+* Internal Server Error
+
+Internal implementation details must never be exposed.
+
+---
+
+# Response Principles
+
+Responses should be:
+
+* Consistent
+* Predictable
+* Easy to understand
+* Business-focused
+
+Return only the information required by the client.
+
+Avoid unnecessary data.
+
+---
+
+# Pagination
+
+Large datasets should support pagination.
+
+Typical examples include:
+
+* Products
+* Orders
+* Inventory
+* Reports
+
+Pagination should remain consistent across all modules.
+
+---
+
+# Search
+
+Search operations should:
+
+* Support partial matches where appropriate.
+* Return predictable results.
+* Respect user permissions.
+* Filter only accessible data.
+
+---
+
+# Filtering
+
+Filtering should be available where it improves usability.
+
+Typical filters include:
+
+* Status
+* Category
+* Date
+* Company
+* Warehouse
+* Supplier
+* Buyer
+
+Business modules define their own supported filters.
+
+---
+
+# Sorting
+
+Sorting should be consistent across modules.
+
+Common sorting options include:
+
+* Name
+* Created Date
+* Updated Date
+* Status
+* Price
+* Quantity
+
+---
+
+# Security Standards
+
+Every API must follow these security principles:
+
+* Authentication required where appropriate.
+* Server-side authorization.
+* Input validation.
+* Protection against unauthorized access.
+* Secure handling of sensitive information.
+* Audit-ready business operations where required.
+
+---
+
+# API Documentation Rules
+
+Every business module must maintain its own `API.md`.
+
+Module documentation should include:
+
+* Purpose
+* Available operations
+* Validation rules
+* Business rules
+* Request fields
+* Response fields
+* Error scenarios
+* Security requirements
+
+Project-wide standards should never be duplicated inside module documentation.
+
+---
+
+# Future Improvements
+
+Future versions may include:
+
+* API versioning
+* Rate limiting
+* Webhooks
+* Batch operations
+* Background job APIs
+* Public developer APIs
+* OpenAPI documentation
+* API monitoring
+* API analytics
+
+---
+
+# Related Documentation
+
+Project documentation:
+
+```text
+ARCHITECTURE.md
+AUTHENTICATION.md
+DOCUMENTATION_STRUCTURE.md
+ROADMAP.md
+```
+
+Business module documentation:
+
+```text
+docs/UI/<module>/API.md
+```
+
+---
+
+# Version History
+
+## Version 1.0
+
+Initial API standards document.
+
+Focus areas:
+
+* Project-wide API standards.
+* Consistent API design.
+* Module ownership.
+* Validation standards.
+* Security principles.
+* Documentation guidelines.

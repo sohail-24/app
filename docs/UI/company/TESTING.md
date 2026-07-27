@@ -1,6 +1,6 @@
 # Company Testing
 
-Version: 1.0
+Version: 1.1
 
 Status: Approved Design
 
@@ -24,6 +24,7 @@ The Company module follows these testing principles:
 
 * Test business functionality before visual appearance.
 * Validate all required inputs.
+* Verify business configuration changes affect dependent modules correctly.
 * Verify authentication and authorization.
 * Test both successful and failure scenarios.
 * Ensure consistent behavior across supported devices.
@@ -74,10 +75,12 @@ Verify that:
 * Company information loads correctly.
 * Company logo displays correctly.
 * Default logo is shown when no logo exists.
+* Delivery settings load correctly.
+* Supported delivery states are displayed.
 
-Expected Result
+### Expected Result
 
-Company information is displayed accurately.
+Company information and delivery settings are displayed accurately.
 
 ---
 
@@ -88,11 +91,12 @@ Verify that:
 * First-time users can create a company profile.
 * Required fields are enforced.
 * Optional fields can be left empty.
+* At least one delivery state must be configured.
 * Company profile is created successfully.
 
-Expected Result
+### Expected Result
 
-Company information is saved and displayed.
+Company information and delivery settings are saved and displayed.
 
 ---
 
@@ -110,9 +114,25 @@ Verify that users can update:
 * State
 * Postal Code
 
-Expected Result
+### Expected Result
 
 Updated information is saved successfully.
+
+---
+
+## Delivery Settings
+
+Verify that:
+
+* Business Owner can view delivery settings.
+* Business Owner can enable delivery states.
+* Business Owner can disable delivery states.
+* Updated delivery settings are saved successfully.
+* Orders immediately use the updated delivery configuration.
+
+### Expected Result
+
+Delivery settings are updated successfully.
 
 ---
 
@@ -122,6 +142,7 @@ Verify that:
 
 * Unsaved changes are discarded.
 * Original values are restored.
+* Delivery settings are restored.
 * Save button becomes inactive after cancellation.
 
 ---
@@ -133,6 +154,7 @@ Verify that:
 * Only modified fields are updated.
 * Success notification appears.
 * Updated information is displayed immediately.
+* Delivery settings become active immediately after saving.
 
 ---
 
@@ -146,7 +168,7 @@ Verify:
 * Replace existing logo.
 * Preview updates correctly.
 
-Expected Result
+### Expected Result
 
 New company logo is displayed.
 
@@ -160,7 +182,7 @@ Verify rejection of:
 * Empty uploads.
 * Files exceeding maximum size.
 
-Expected Result
+### Expected Result
 
 Clear validation message displayed.
 
@@ -194,11 +216,12 @@ Verify:
 * Unauthorized users cannot modify company information.
 * Unauthorized logo uploads are rejected.
 * Unauthorized logo deletion is rejected.
+* Unauthorized users cannot modify delivery settings.
 * Server enforces authorization for every protected request.
 
-Expected Result
+### Expected Result
 
-Only authorized users can manage company information.
+Only authorized users can manage company information and delivery settings.
 
 ---
 
@@ -217,7 +240,7 @@ Test:
 * Empty State.
 * Empty Postal Code.
 
-Expected Result
+### Expected Result
 
 Validation errors are displayed.
 
@@ -239,6 +262,20 @@ Verify:
 * Invalid image format.
 * Oversized image.
 * Empty upload.
+
+---
+
+## Delivery Settings
+
+Verify:
+
+* No delivery state selected.
+* Duplicate delivery states are rejected.
+* Unsupported delivery state configuration is rejected.
+
+### Expected Result
+
+Appropriate validation messages are displayed.
 
 ---
 
@@ -286,6 +323,22 @@ Verify all documented APIs.
 
 ---
 
+## Get Delivery Settings
+
+* Successful response.
+* Unauthorized request.
+* Company not found.
+
+---
+
+## Update Delivery Settings
+
+* Successful update.
+* Invalid configuration.
+* Unauthorized update.
+
+---
+
 # Database Testing
 
 Verify:
@@ -294,6 +347,8 @@ Verify:
 * Correct company record is updated.
 * Only modified fields are updated.
 * Company logo reference is stored correctly.
+* Delivery settings are stored correctly.
+* Updated delivery settings persist after reload.
 * Duplicate company records are prevented.
 
 ---
@@ -308,6 +363,7 @@ Verify:
 * Input validation.
 * Output sanitization.
 * Secure logo upload validation.
+* Delivery settings can only be modified by authorized users.
 * Sensitive information is protected.
 
 ---
@@ -320,6 +376,8 @@ Verify:
 * Card alignment.
 * Button placement.
 * Dialog behavior.
+* Delivery Settings card.
+* Toggle state behaviour.
 * Success notifications.
 * Validation messages.
 * Loading skeletons.
@@ -336,6 +394,7 @@ Verify:
 * Multi-column layout.
 * Proper spacing.
 * Header actions visible.
+* Delivery Settings display correctly.
 
 ---
 
@@ -346,6 +405,7 @@ Verify:
 * Cards stack correctly.
 * Touch interactions function properly.
 * Dialogs display correctly.
+* Delivery Settings display correctly.
 
 ---
 
@@ -358,6 +418,7 @@ Verify:
 * Sticky Save button.
 * Large touch-friendly controls.
 * Comfortable one-hand usage.
+* Delivery Settings display correctly.
 
 ---
 
@@ -381,6 +442,7 @@ Verify:
 
 * Company page loads quickly.
 * Company logo upload provides responsive feedback.
+* Delivery settings load without noticeable delay.
 * No unnecessary API requests.
 * Partial updates only send modified fields.
 * Save operations do not block the interface.
@@ -395,10 +457,12 @@ Verify:
 * Network interruption.
 * Server error.
 * Validation failure.
+* Invalid delivery configuration.
+* Delivery settings save failure.
 * Session expiration.
 * Logo upload failure.
 
-Expected Result
+### Expected Result
 
 Clear, user-friendly error messages with recovery options.
 
@@ -410,6 +474,8 @@ Before every release, verify:
 
 * Company creation still works.
 * Company updates still work.
+* Delivery settings continue to work.
+* Orders correctly use configured delivery settings.
 * Logo upload still works.
 * Logo removal still works.
 * Existing company information remains intact.
@@ -419,22 +485,25 @@ Before every release, verify:
 
 # Future Testing
 
-Version 1.1
+## Version 1.2
 
 * Business verification.
 * Multiple business locations.
 * Company branding.
 * Tax information.
+* Delivery by City.
+* Delivery by District.
+* Delivery by PIN Code.
+* Delivery Charges.
 
-Version 1.2
+---
+
+## Version 2.0
 
 * Company settings.
 * Currency preferences.
 * Timezone preferences.
 * Language preferences.
-
-Version 2.0
-
 * Multi-company management.
 * Organization administration.
 * Business analytics.
@@ -450,6 +519,8 @@ The Company module is considered complete only when:
 
 * All functional tests pass.
 * All validation rules pass.
+* Delivery settings validation passes.
+* Orders correctly consume configured delivery settings.
 * Authentication is verified.
 * Authorization is enforced.
 * API tests pass.
@@ -462,17 +533,17 @@ The Company module is considered complete only when:
 
 # Module Status
 
-| Item                  | Status     |
-| --------------------- | ---------- |
-| README                | ✅ Complete |
-| Decisions             | ✅ Complete |
-| ASCII Design          | ✅ Complete |
-| Components            | ✅ Complete |
-| User Flows            | ✅ Complete |
-| API Specification     | ✅ Complete |
+| Item | Status |
+|------|--------|
+| README | ✅ Complete |
+| Decisions | ✅ Complete |
+| ASCII Design | ✅ Complete |
+| Components | ✅ Complete |
+| User Flows | ✅ Complete |
+| API Specification | ✅ Complete |
 | Testing Specification | ✅ Complete |
-| Implementation        | ⏳ Pending  |
-| Production Ready      | ⏳ Pending  |
+| Implementation | ⏳ Pending |
+| Production Ready | ⏳ Pending |
 
 ---
 
@@ -482,6 +553,6 @@ This document defines the official testing strategy for the Company module.
 
 All implementation, quality assurance, and future maintenance must follow this specification before the module is considered production-ready.
 
-**Version:** 1.0
+**Version:** 1.1
 
 **Status:** Documentation Complete

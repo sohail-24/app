@@ -65,6 +65,20 @@ The design prioritizes simplicity, fast onboarding, and a consistent experience 
 +-------------------------------------------------------------------------------+
 
 +-------------------------------------------------------------------------------+
+|                          Delivery Settings                                   |
+|-------------------------------------------------------------------------------|
+| Supported States                                                      [ Edit ]|
+|-------------------------------------------------------------------------------|
+| ☑ Telangana                                                            Active |
+| ☑ Andhra Pradesh                                                       Active |
+| ☐ Karnataka                                                          Disabled |
+| ☐ Maharashtra                                                        Disabled |
+| ☐ Tamil Nadu                                                        Disabled |
+|-------------------------------------------------------------------------------|
+| Orders are accepted only from enabled states.                                |
++-------------------------------------------------------------------------------+
+
++-------------------------------------------------------------------------------+
 |                      Cancel                    Save Changes                   |
 +-------------------------------------------------------------------------------+
 ```
@@ -105,6 +119,17 @@ The design prioritizes simplicity, fast onboarding, and a consistent experience 
 | City                                                      |
 | State                                                     |
 | Postal Code                                               |
++-----------------------------------------------------------+
++-----------------------------------------------------------+
+| Delivery Settings                                         |
+|-----------------------------------------------------------|
+| ☑ Telangana                                               |
+| ☑ Andhra Pradesh                                          |
+| ☐ Karnataka                                                |
+| ☐ Maharashtra                                              |
+| ☐ Tamil Nadu                                               |
+|                                                           |
+| Orders are accepted only from enabled states.            |
 +-----------------------------------------------------------+
 
 +-----------------------------------------------------------+
@@ -166,6 +191,25 @@ The design prioritizes simplicity, fast onboarding, and a consistent experience 
 |                                  |
 | Postal Code *                    |
 | [__________________________]     |
++----------------------------------+
++----------------------------------+
+| Delivery Settings                |
++----------------------------------+
+
+☑ Telangana
+
+☑ Andhra Pradesh
+
+☐ Karnataka
+
+☐ Maharashtra
+
+☐ Tamil Nadu
+
+------------------------------------
+
+Orders are accepted only from
+enabled states.
 +----------------------------------+
 
 +----------------------------------+
@@ -244,6 +288,29 @@ The design prioritizes simplicity, fast onboarding, and a consistent experience 
 
 ---
 
+# Delivery Settings Dialog
+
++------------------------------------------------+
+| Configure Delivery States                      |
++------------------------------------------------+
+
+Select states where delivery is available.
+
+☑ Telangana
+
+☑ Andhra Pradesh
+
+☐ Karnataka
+
+☐ Maharashtra
+
+☐ Tamil Nadu
+
+----------------------------------------------
+
+Cancel                      Save Changes
+
+
 # Success Notification
 
 ```text
@@ -251,6 +318,10 @@ The design prioritizes simplicity, fast onboarding, and a consistent experience 
 | ✅ Company information updated.      |
 +--------------------------------------+
 ```
+
++----------------------------------------------+
+| ✅ Delivery settings updated successfully.   |
++----------------------------------------------+
 
 ---
 
@@ -268,6 +339,10 @@ The design prioritizes simplicity, fast onboarding, and a consistent experience 
 +--------------------------------------+
 | ❌ Business Phone is required.       |
 +--------------------------------------+
+
++----------------------------------------------+
+| ❌ Select at least one supported state.      |
++----------------------------------------------+
 ```
 
 ---
@@ -295,6 +370,12 @@ Mobile
 * Easy thumb navigation.
 * Minimal scrolling.
 
+Delivery Settings
+
+• Checkbox list
+• Scrollable if many states
+• Easy touch selection on mobile
+
 ---
 
 # UI Rules
@@ -307,7 +388,11 @@ Mobile
 * Maintain consistent spacing between cards.
 * Never overwhelm users with unnecessary settings.
 * Prioritize speed and simplicity.
-
+* Delivery Settings should appear after Business Address.
+* At least one delivery state must remain enabled.
+* Disabled states are clearly distinguishable.
+* Changes require explicit Save.
+* Orders module uses these settings during checkout.
 ---
 
 # Approval
