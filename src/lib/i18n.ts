@@ -61,9 +61,17 @@ export const unitLabels: Record<string, string> = {
 export function getProductMeta(product: { tags?: string | null }) {
   if (!product.tags) return {};
   try {
-    return JSON.parse(product.tags) as { sku?: string; barcode?: string };
+    return JSON.parse(product.tags) as {
+      sku?: string;
+      barcode?: string;
+      wholesalePrice?: number;
+      discount?: number;
+      tags?: string[];
+    };
   } catch {
-    return {};
+    return {
+      tags: product.tags.split(",").map((tag) => tag.trim()).filter(Boolean),
+    };
   }
 }
 

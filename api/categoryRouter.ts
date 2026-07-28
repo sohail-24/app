@@ -28,25 +28,43 @@ function slugify(value: string) {
   );
 }
 
+function canManageCategories(user?: { role?: string | null; email?: string | null } | null) {
+  return user?.role === "admin" || isOwner(user);
+}
+
 export const categoryRouter = createRouter({
   list: publicQuery
     .input(z.object({ includeInactive: z.boolean().optional() }).optional())
     .query(async ({ ctx, input }) => {
       return findAllCategories({
-        includeInactive: input?.includeInactive && (isOwner(ctx.user) || ctx.user?.role === "admin"),
+        includeInactive: input?.includeInactive && canManageCategories(ctx.user),
       });
     }),
 
   bySlug: publicQuery
     .input(z.object({ slug: z.string() }))
-    .query(async ({ input }) => {
-      return findCategoryBySlug(input.slug);
+    .query(async ({ ctx, input }) => {
+      const category = await findCategoryBySlug(input.slug);
+      if (!category || (!canManageCategories(ctx.user) && !category.isActive)) {
+        throw new TRPCError({
+          code: "NOT_FOUND",
+          message: "Category not found.",
+        });
+      }
+      return category;
     }),
 
-  byId: publicQuery
+  byId: ownerQuery
     .input(z.object({ id: z.number() }))
     .query(async ({ input }) => {
-      return findCategoryById(input.id);
+      const category = await findCategoryById(input.id);
+      if (!category) {
+        throw new TRPCError({
+          code: "NOT_FOUND",
+          message: "Category not found.",
+        });
+      }
+      return category;
     }),
 
   create: ownerQuery.input(categoryInput).mutation(async ({ input }) => {

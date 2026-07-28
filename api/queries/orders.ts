@@ -1,42 +1,101 @@
 import { getDb } from "./connection";
-import { orders, orderItems, companies } from "@db/schema";
-import { eq, and, desc, sql } from "drizzle-orm";
+import {
+  cartItems,
+  companies,
+  inventory,
+  orderItems,
+  orders,
+  type InsertOrder,
+  type InsertOrderItem,
+} from "@db/schema";
+import { and, desc, eq, ilike, or, sql } from "drizzle-orm";
 
-// ─── Order Queries ───
+export type OrderStatus = NonNullable<InsertOrder["status"]>;
+export type DeliveryEstimate = NonNullable<InsertOrder["deliveryEstimate"]>;
 
-export async function findOrdersByBuyer(buyerId: number) {
-  const db = getDb();
-  return db
-    .select({
-      id: orders.id,
-      orderNumber: orders.orderNumber,
-      buyerId: orders.buyerId,
-      supplierId: orders.supplierId,
-      placedByUserId: orders.placedByUserId,
-      subtotal: orders.subtotal,
-      taxAmount: orders.taxAmount,
-      shippingAmount: orders.shippingAmount,
-      discountAmount: orders.discountAmount,
-      totalAmount: orders.totalAmount,
-      currency: orders.currency,
-      status: orders.status,
-      paymentStatus: orders.paymentStatus,
-      shippingMethod: orders.shippingMethod,
-      trackingNumber: orders.trackingNumber,
-      orderedAt: orders.orderedAt,
-      createdAt: orders.createdAt,
-      updatedAt: orders.updatedAt,
-      supplierName: companies.name,
-    })
-    .from(orders)
-    .leftJoin(companies, eq(orders.supplierId, companies.id))
-    .where(eq(orders.buyerId, buyerId))
-    .orderBy(desc(orders.createdAt));
+export const orderStatuses = [
+  "pending",
+  "confirmed",
+  "packed",
+  "ready_for_dispatch",
+  "out_for_delivery",
+  "delivered",
+  "cancelled",
+] as const satisfies readonly OrderStatus[];
+
+export const deliveryEstimates = [
+  "same_day",
+  "next_day",
+  "within_2_days",
+  "within_3_5_days",
+] as const satisfies readonly DeliveryEstimate[];
+
+export const orderStatusTransitions: Record<OrderStatus, readonly OrderStatus[]> = {
+  pending: ["confirmed", "cancelled"],
+  confirmed: ["packed"],
+  packed: ["ready_for_dispatch"],
+  ready_for_dispatch: ["out_for_delivery"],
+  out_for_delivery: ["delivered"],
+  delivered: [],
+  cancelled: [],
+};
+
+function calculateAvailableStock(quantityOnHand: number, quantityReserved: number) {
+  return Math.max(0, quantityOnHand - quantityReserved);
 }
 
-export async function findOrdersBySupplier(supplierId: number) {
+function calculateInventoryStatus(quantityAvailable: number, reorderLevel: number) {
+  if (quantityAvailable <= 0) return "out_of_stock" as const;
+  if (quantityAvailable <= reorderLevel) return "low_stock" as const;
+  return "in_stock" as const;
+}
+
+function orderTimestampForStatus(status: OrderStatus) {
+  const timestampMap: Partial<Record<OrderStatus, keyof InsertOrder>> = {
+    confirmed: "confirmedAt",
+    out_for_delivery: "shippedAt",
+    delivered: "deliveredAt",
+    cancelled: "cancelledAt",
+  };
+  return timestampMap[status];
+}
+
+export type OrderListFilters = {
+  search?: string;
+  status?: OrderStatus;
+  deliveryEstimate?: DeliveryEstimate;
+  page?: number;
+  size?: number;
+};
+
+async function findOrdersForCompany(
+  companyId: number | undefined,
+  type: "buyer" | "supplier",
+  filters?: OrderListFilters,
+) {
   const db = getDb();
-  return db
+  const relatedCompanyName =
+    type === "buyer"
+      ? sql<string>`${companies.name}`.as("supplierName")
+      : sql<string>`${companies.name}`.as("buyerName");
+  const conditions = companyId
+    ? [type === "buyer" ? eq(orders.buyerId, companyId) : eq(orders.supplierId, companyId)]
+    : [];
+
+  if (filters?.status) {
+    conditions.push(eq(orders.status, filters.status));
+  }
+  if (filters?.deliveryEstimate) {
+    conditions.push(eq(orders.deliveryEstimate, filters.deliveryEstimate));
+  }
+  if (filters?.search?.trim()) {
+    const pattern = `%${filters.search.trim()}%`;
+    conditions.push(or(ilike(orders.orderNumber, pattern), ilike(companies.name, pattern))!);
+  }
+  const page = Math.max(1, filters?.page ?? 1);
+  const size = Math.min(100, Math.max(1, filters?.size ?? 20));
+
+  const items = await db
     .select({
       id: orders.id,
       orderNumber: orders.orderNumber,
@@ -51,66 +110,91 @@ export async function findOrdersBySupplier(supplierId: number) {
       currency: orders.currency,
       status: orders.status,
       paymentStatus: orders.paymentStatus,
+      deliveryEstimate: orders.deliveryEstimate,
       shippingMethod: orders.shippingMethod,
       trackingNumber: orders.trackingNumber,
       orderedAt: orders.orderedAt,
       createdAt: orders.createdAt,
       updatedAt: orders.updatedAt,
-      buyerName: companies.name,
+      relatedCompanyName,
+      itemCount: sql<number>`count(${orderItems.id})`,
     })
     .from(orders)
-    .leftJoin(companies, eq(orders.buyerId, companies.id))
-    .where(eq(orders.supplierId, supplierId))
-    .orderBy(desc(orders.createdAt));
+    .leftJoin(
+      companies,
+      type === "buyer"
+        ? eq(orders.supplierId, companies.id)
+        : eq(orders.buyerId, companies.id),
+    )
+    .leftJoin(orderItems, eq(orders.id, orderItems.orderId))
+    .where(conditions.length ? and(...conditions) : undefined)
+    .groupBy(orders.id, companies.name)
+    .orderBy(desc(orders.createdAt))
+    .limit(size)
+    .offset((page - 1) * size);
+
+  const totalRows = await db
+    .select({ total: sql<number>`count(distinct ${orders.id})` })
+    .from(orders)
+    .leftJoin(
+      companies,
+      type === "buyer"
+        ? eq(orders.supplierId, companies.id)
+        : eq(orders.buyerId, companies.id),
+    )
+    .where(conditions.length ? and(...conditions) : undefined);
+
+  return {
+    items,
+    total: Number(totalRows[0]?.total ?? 0),
+    page,
+    size,
+  };
+}
+
+export function findOrdersByBuyer(buyerId: number, filters?: OrderListFilters) {
+  return findOrdersForCompany(buyerId, "buyer", filters);
+}
+
+export function findOrdersBySupplier(supplierId?: number, filters?: OrderListFilters) {
+  return findOrdersForCompany(supplierId, "supplier", filters);
 }
 
 export async function findOrderById(orderId: number) {
   const db = getDb();
-  const rows = await db
-    .select({
-      id: orders.id,
-      orderNumber: orders.orderNumber,
-      buyerId: orders.buyerId,
-      supplierId: orders.supplierId,
-      placedByUserId: orders.placedByUserId,
-      subtotal: orders.subtotal,
-      taxAmount: orders.taxAmount,
-      shippingAmount: orders.shippingAmount,
-      discountAmount: orders.discountAmount,
-      totalAmount: orders.totalAmount,
-      currency: orders.currency,
-      status: orders.status,
-      paymentStatus: orders.paymentStatus,
-      shippingAddressLine1: orders.shippingAddressLine1,
-      shippingAddressLine2: orders.shippingAddressLine2,
-      shippingCity: orders.shippingCity,
-      shippingState: orders.shippingState,
-      shippingPostalCode: orders.shippingPostalCode,
-      shippingCountry: orders.shippingCountry,
-      shippingMethod: orders.shippingMethod,
-      trackingNumber: orders.trackingNumber,
-      estimatedDeliveryDate: orders.estimatedDeliveryDate,
-      orderedAt: orders.orderedAt,
-      confirmedAt: orders.confirmedAt,
-      shippedAt: orders.shippedAt,
-      deliveredAt: orders.deliveredAt,
-      cancelledAt: orders.cancelledAt,
-      buyerNotes: orders.buyerNotes,
-      sellerNotes: orders.sellerNotes,
-      internalNotes: orders.internalNotes,
-      createdAt: orders.createdAt,
-      updatedAt: orders.updatedAt,
-    })
-    .from(orders)
-    .where(eq(orders.id, orderId))
-    .limit(1);
+  const rows = await db.select().from(orders).where(eq(orders.id, orderId)).limit(1);
+  const order = rows[0] ?? null;
 
-  return rows[0] ?? null;
+  if (!order) return null;
+
+  const [buyer, supplier] = await Promise.all([
+    db.query.companies.findFirst({ where: eq(companies.id, order.buyerId) }),
+    db.query.companies.findFirst({ where: eq(companies.id, order.supplierId) }),
+  ]);
+
+  return {
+    ...order,
+    buyerName: buyer?.name ?? null,
+    buyerPhone: buyer?.phone ?? null,
+    buyerAddressLine1: buyer?.addressLine1 ?? null,
+    buyerAddressLine2: buyer?.addressLine2 ?? null,
+    buyerCity: buyer?.city ?? null,
+    buyerState: buyer?.state ?? null,
+    buyerPostalCode: buyer?.postalCode ?? null,
+    buyerCountry: buyer?.country ?? null,
+    supplierName: supplier?.name ?? null,
+    supplierPhone: supplier?.phone ?? null,
+    supplierAddressLine1: supplier?.addressLine1 ?? null,
+    supplierAddressLine2: supplier?.addressLine2 ?? null,
+    supplierCity: supplier?.city ?? null,
+    supplierState: supplier?.state ?? null,
+    supplierPostalCode: supplier?.postalCode ?? null,
+    supplierCountry: supplier?.country ?? null,
+  };
 }
 
 export async function findOrderItems(orderId: number) {
-  const db = getDb();
-  return db
+  return getDb()
     .select()
     .from(orderItems)
     .where(eq(orderItems.orderId, orderId))
@@ -125,108 +209,175 @@ export async function findOrderWithDetails(orderId: number) {
   return { ...order, items };
 }
 
-export async function createOrder(data: {
-  orderNumber: string;
-  buyerId: number;
-  supplierId: number;
-  placedByUserId: number;
-  subtotal: string;
-  taxAmount?: string;
-  shippingAmount?: string;
-  discountAmount?: string;
-  totalAmount: string;
-  currency?: string;
-  shippingAddressLine1?: string;
-  shippingCity?: string;
-  shippingState?: string;
-  shippingPostalCode?: string;
-  shippingCountry?: string;
-  shippingMethod?: string;
-  buyerNotes?: string;
+export async function createOrderFromCart(data: {
+  order: InsertOrder;
+  items: Array<
+    Omit<InsertOrderItem, "id" | "createdAt" | "orderId"> & {
+      inventoryId: number;
+      currentReserved: number;
+      quantityOnHand: number;
+      reorderLevel: number;
+    }
+  >;
+  userId: number;
 }) {
   const db = getDb();
-  const result = await db
-    .insert(orders)
-    .values(data)
-    .returning({ id: orders.id });
-  return result[0].id;
+
+  return db.transaction(async (tx) => {
+    const [created] = await tx
+      .insert(orders)
+      .values(data.order)
+      .returning({ id: orders.id, orderNumber: orders.orderNumber });
+
+    await tx.insert(orderItems).values(
+      data.items.map(({ inventoryId: _inventoryId, currentReserved: _currentReserved, quantityOnHand: _quantityOnHand, reorderLevel: _reorderLevel, ...item }) => ({
+        ...item,
+        orderId: created.id,
+      })),
+    );
+
+    for (const item of data.items) {
+      const quantityReserved = item.currentReserved + item.quantity;
+      const quantityAvailable = calculateAvailableStock(item.quantityOnHand, quantityReserved);
+      await tx
+        .update(inventory)
+        .set({
+          quantityReserved,
+          quantityAvailable,
+          status: calculateInventoryStatus(quantityAvailable, item.reorderLevel),
+          lastCountedAt: new Date(),
+          updatedAt: new Date(),
+        })
+        .where(eq(inventory.id, item.inventoryId));
+    }
+
+    await tx.delete(cartItems).where(eq(cartItems.userId, data.userId));
+
+    return created;
+  });
 }
 
-export async function createOrderItems(
-  items: Array<{
-    orderId: number;
-    productId: number;
-    productName: string;
-    productImage?: string;
-    quantity: number;
-    unitPrice: string;
-    totalPrice: string;
-    unitType: string;
-    notes?: string;
-  }>
-) {
+export async function updateOrderStatus(orderId: number, status: OrderStatus) {
   const db = getDb();
-  const typedItems = items.map((item) => ({
-    ...item,
-    unitType: item.unitType as
-      | "kg"
-      | "lb"
-      | "case"
-      | "pallet"
-      | "each"
-      | "bunch"
-      | "box"
-      | "bag",
-  }));
-  await db.insert(orderItems).values(typedItems);
-}
+  const timestampField = orderTimestampForStatus(status);
+  const updates: Record<string, unknown> = { status, updatedAt: new Date() };
 
-export async function updateOrderStatus(
-  orderId: number,
-  status: string,
-  timestampField?: string
-) {
-  const db = getDb();
-  const updates: Record<string, unknown> = { status: status as any };
   if (timestampField) {
     updates[timestampField] = new Date();
   }
-  await db.update(orders).set(updates).where(eq(orders.id, orderId));
+
+  await db.transaction(async (tx) => {
+    const [order] = await tx.select().from(orders).where(eq(orders.id, orderId)).limit(1);
+    if (!order) return;
+
+    const items = await tx.select().from(orderItems).where(eq(orderItems.orderId, orderId));
+
+    if (status === "cancelled" && order.status !== "cancelled") {
+      for (const item of items) {
+        const [record] = await tx
+          .select()
+          .from(inventory)
+          .where(and(eq(inventory.productId, item.productId), eq(inventory.supplierId, order.supplierId)))
+          .limit(1);
+        if (!record) continue;
+        const quantityReserved = Math.max(0, record.quantityReserved - item.quantity);
+        const quantityAvailable = calculateAvailableStock(record.quantityOnHand, quantityReserved);
+        await tx
+          .update(inventory)
+          .set({
+            quantityReserved,
+            quantityAvailable,
+            status: calculateInventoryStatus(quantityAvailable, record.reorderLevel),
+            updatedAt: new Date(),
+          })
+          .where(eq(inventory.id, record.id));
+      }
+    }
+
+    if (status === "delivered" && order.status !== "delivered") {
+      for (const item of items) {
+        const [record] = await tx
+          .select()
+          .from(inventory)
+          .where(and(eq(inventory.productId, item.productId), eq(inventory.supplierId, order.supplierId)))
+          .limit(1);
+        if (!record) continue;
+        const quantityOnHand = Math.max(0, record.quantityOnHand - item.quantity);
+        const quantityReserved = Math.max(0, record.quantityReserved - item.quantity);
+        const quantityAvailable = calculateAvailableStock(quantityOnHand, quantityReserved);
+        await tx
+          .update(inventory)
+          .set({
+            quantityOnHand,
+            quantityReserved,
+            quantityAvailable,
+            status: calculateInventoryStatus(quantityAvailable, record.reorderLevel),
+            lastCountedAt: new Date(),
+            updatedAt: new Date(),
+          })
+          .where(eq(inventory.id, record.id));
+      }
+    }
+
+    await tx.update(orders).set(updates).where(eq(orders.id, orderId));
+  });
 }
 
-export async function countOrdersByStatus(companyId: number) {
-  const db = getDb();
-  const result = await db
+export async function updateOrderDeliveryEstimate(
+  orderId: number,
+  deliveryEstimate: DeliveryEstimate,
+) {
+  await getDb()
+    .update(orders)
+    .set({ deliveryEstimate, updatedAt: new Date() })
+    .where(eq(orders.id, orderId));
+}
+
+export async function cancelOrder(orderId: number) {
+  await updateOrderStatus(orderId, "cancelled");
+}
+
+export async function countOrdersByStatus(companyId?: number) {
+  return getDb()
     .select({
       status: orders.status,
       count: sql<number>`count(*)`,
     })
     .from(orders)
-    .where(
-      and(
-        eq(orders.buyerId, companyId),
-        sql`${orders.status} != 'cancelled'`
-      )
-    )
+    .where(companyId ? eq(orders.supplierId, companyId) : undefined)
     .groupBy(orders.status);
-
-  return result;
 }
 
-export async function getRecentOrders(companyId: number, limit = 5) {
-  const db = getDb();
-  return db
+export async function getRecentOrders(companyId: number | undefined, limit = 5, type: "buyer" | "supplier" = "buyer") {
+  const relatedCompanyName =
+    type === "buyer"
+      ? sql<string>`${companies.name}`.as("supplierName")
+      : sql<string>`${companies.name}`.as("buyerName");
+
+  return getDb()
     .select({
       id: orders.id,
       orderNumber: orders.orderNumber,
       totalAmount: orders.totalAmount,
       status: orders.status,
+      deliveryEstimate: orders.deliveryEstimate,
       orderedAt: orders.orderedAt,
-      supplierName: companies.name,
+      relatedCompanyName,
     })
     .from(orders)
-    .leftJoin(companies, eq(orders.supplierId, companies.id))
-    .where(eq(orders.buyerId, companyId))
+    .leftJoin(
+      companies,
+      type === "buyer"
+        ? eq(orders.supplierId, companies.id)
+        : eq(orders.buyerId, companies.id),
+    )
+    .where(
+      companyId
+        ? type === "buyer"
+          ? eq(orders.buyerId, companyId)
+          : eq(orders.supplierId, companyId)
+        : undefined,
+    )
     .orderBy(desc(orders.createdAt))
     .limit(limit);
 }

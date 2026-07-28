@@ -9,6 +9,7 @@ import {
   bigint,
   pgEnum,
   index,
+  uniqueIndex,
   boolean,
 } from "drizzle-orm/pg-core";
 
@@ -51,13 +52,19 @@ export const productStatusEnum = pgEnum("product_status", [
 export const orderStatusEnum = pgEnum("order_status", [
   "pending",
   "confirmed",
-  "processing",
-  "shipped",
+  "packed",
+  "ready_for_dispatch",
+  "out_for_delivery",
   "delivered",
   "cancelled",
-  "refunded",
-  "disputed",
 ]);
+export const deliveryEstimateEnum = pgEnum("delivery_estimate", [
+  "same_day",
+  "next_day",
+  "within_2_days",
+  "within_3_5_days",
+]);
+export const invoiceStatusEnum = pgEnum("invoice_status", ["generated"]);
 export const paymentStatusEnum = pgEnum("paymentStatus", [
   "pending",
   "authorized",
@@ -66,10 +73,29 @@ export const paymentStatusEnum = pgEnum("paymentStatus", [
   "refunded",
   "failed",
 ]);
+export const userGenderEnum = pgEnum("user_gender", [
+  "male",
+  "female",
+  "other",
+  "prefer_not_to_say",
+]);
+export const userThemePreferenceEnum = pgEnum("user_theme_preference", [
+  "system",
+  "light",
+  "dark",
+]);
 export const inventoryStatusEnum = pgEnum("inventory_status", [
   "in_stock",
   "low_stock",
   "out_of_stock",
+]);
+export const warehouseStatusEnum = pgEnum("warehouse_status", [
+  "active",
+  "inactive",
+]);
+export const warehouseMovementTypeEnum = pgEnum("warehouse_movement_type", [
+  "receive",
+  "dispatch",
 ]);
 export const otpPurposeEnum = pgEnum("purpose", ["login"]);
 
@@ -93,6 +119,16 @@ export const users = pgTable(
     // B2B: each user belongs to a company
     companyId: bigint("companyId", { mode: "number" }),
     phone: varchar("phone", { length: 50 }),
+    dateOfBirth: timestamp("dateOfBirth"),
+    gender: userGenderEnum("gender"),
+    addressLine1: varchar("addressLine1", { length: 255 }),
+    city: varchar("city", { length: 100 }),
+    state: varchar("state", { length: 100 }),
+    country: varchar("country", { length: 100 }),
+    postalCode: varchar("postalCode", { length: 20 }),
+    themePreference: userThemePreferenceEnum("themePreference")
+      .default("system")
+      .notNull(),
     mobileVerifiedAt: timestamp("mobileVerifiedAt"),
     emailVerifiedAt: timestamp("emailVerifiedAt"),
     jobTitle: varchar("jobTitle", { length: 100 }),
@@ -362,6 +398,7 @@ export const orders = pgTable(
     shippingCountry: varchar("shippingCountry", { length: 100 }),
     shippingMethod: varchar("shippingMethod", { length: 100 }),
     trackingNumber: varchar("trackingNumber", { length: 100 }),
+    deliveryEstimate: deliveryEstimateEnum("deliveryEstimate"),
     estimatedDeliveryDate: timestamp("estimatedDeliveryDate"),
     actualDeliveryDate: timestamp("actualDeliveryDate"),
     // Dates
@@ -385,6 +422,7 @@ export const orders = pgTable(
     buyerIdx: index("order_buyer_idx").on(table.buyerId),
     supplierIdx: index("order_supplier_idx").on(table.supplierId),
     statusIdx: index("order_status_idx").on(table.status),
+    deliveryEstimateIdx: index("order_delivery_estimate_idx").on(table.deliveryEstimate),
     paymentStatusIdx: index("order_payment_idx").on(table.paymentStatus),
     orderedAtIdx: index("order_date_idx").on(table.orderedAt),
     placedByIdx: index("order_placed_by_idx").on(table.placedByUserId),
@@ -420,6 +458,66 @@ export const orderItems = pgTable(
 
 export type OrderItem = typeof orderItems.$inferSelect;
 export type InsertOrderItem = typeof orderItems.$inferInsert;
+
+// ─────────────────────────────────────────────────────────────
+// INVOICES — Immutable financial documents generated from orders
+// ─────────────────────────────────────────────────────────────
+export const invoices = pgTable(
+  "invoices",
+  {
+    id: bigserial("id", { mode: "number" }).primaryKey(),
+    companyId: bigint("companyId", { mode: "number" }).notNull(),
+    orderId: bigint("orderId", { mode: "number" }).notNull().unique(),
+    invoiceNumber: varchar("invoiceNumber", { length: 50 }).notNull().unique(),
+    orderNumber: varchar("orderNumber", { length: 50 }).notNull(),
+    status: invoiceStatusEnum("status").default("generated").notNull(),
+    invoiceDate: timestamp("invoiceDate").defaultNow().notNull(),
+    companyName: varchar("companyName", { length: 255 }).notNull(),
+    companyPhone: varchar("companyPhone", { length: 50 }),
+    companyAddress: text("companyAddress"),
+    customerName: varchar("customerName", { length: 255 }).notNull(),
+    customerPhone: varchar("customerPhone", { length: 50 }),
+    billingAddress: text("billingAddress"),
+    subtotal: numeric("subtotal", { precision: 12, scale: 2 }).notNull(),
+    totalAmount: numeric("totalAmount", { precision: 12, scale: 2 }).notNull(),
+    archivedAt: timestamp("archivedAt"),
+    createdAt: timestamp("createdAt").defaultNow().notNull(),
+    updatedAt: timestamp("updatedAt")
+      .defaultNow()
+      .notNull()
+      .$onUpdate(() => new Date()),
+  },
+  (table) => ({
+    companyIdx: index("invoice_company_idx").on(table.companyId),
+    orderIdx: index("invoice_order_idx").on(table.orderId),
+    invoiceNumberIdx: index("invoice_number_idx").on(table.invoiceNumber),
+    statusIdx: index("invoice_status_idx").on(table.status),
+    invoiceDateIdx: index("invoice_date_idx").on(table.invoiceDate),
+  })
+);
+
+export type Invoice = typeof invoices.$inferSelect;
+export type InsertInvoice = typeof invoices.$inferInsert;
+
+export const invoiceItems = pgTable(
+  "invoice_items",
+  {
+    id: bigserial("id", { mode: "number" }).primaryKey(),
+    invoiceId: bigint("invoiceId", { mode: "number" }).notNull(),
+    productName: varchar("productName", { length: 255 }).notNull(),
+    quantity: integer("quantity").notNull(),
+    unitType: unitTypeEnum("unitType").notNull(),
+    unitPrice: numeric("unitPrice", { precision: 12, scale: 2 }).notNull(),
+    totalPrice: numeric("totalPrice", { precision: 12, scale: 2 }).notNull(),
+    createdAt: timestamp("createdAt").defaultNow().notNull(),
+  },
+  (table) => ({
+    invoiceIdx: index("invoice_item_invoice_idx").on(table.invoiceId),
+  })
+);
+
+export type InvoiceItem = typeof invoiceItems.$inferSelect;
+export type InsertInvoiceItem = typeof invoiceItems.$inferInsert;
 
 // ─────────────────────────────────────────────────────────────
 // INVENTORY — Stock tracking per product per supplier
@@ -468,3 +566,67 @@ export const inventory = pgTable(
 
 export type Inventory = typeof inventory.$inferSelect;
 export type InsertInventory = typeof inventory.$inferInsert;
+
+// ─────────────────────────────────────────────────────────────
+// WAREHOUSES — Single physical storage location per company
+// ─────────────────────────────────────────────────────────────
+export const warehouses = pgTable(
+  "warehouses",
+  {
+    id: bigserial("id", { mode: "number" }).primaryKey(),
+    companyId: bigint("companyId", { mode: "number" }).notNull(),
+    name: varchar("name", { length: 255 }).notNull(),
+    code: varchar("code", { length: 80 }),
+    description: text("description"),
+    address: text("address").notNull(),
+    contactPerson: varchar("contactPerson", { length: 255 }),
+    contactNumber: varchar("contactNumber", { length: 50 }),
+    status: warehouseStatusEnum("status").default("active").notNull(),
+    archivedAt: timestamp("archivedAt"),
+    createdAt: timestamp("createdAt").defaultNow().notNull(),
+    updatedAt: timestamp("updatedAt")
+      .defaultNow()
+      .notNull()
+      .$onUpdate(() => new Date()),
+  },
+  (table) => ({
+    companyIdx: uniqueIndex("warehouse_company_idx").on(table.companyId),
+    codeIdx: uniqueIndex("warehouse_code_idx").on(table.code),
+    statusIdx: index("warehouse_status_idx").on(table.status),
+  })
+);
+
+export type Warehouse = typeof warehouses.$inferSelect;
+export type InsertWarehouse = typeof warehouses.$inferInsert;
+
+// ─────────────────────────────────────────────────────────────
+// WAREHOUSE STOCK MOVEMENTS — Audit-ready receive/dispatch log
+// ─────────────────────────────────────────────────────────────
+export const warehouseStockMovements = pgTable(
+  "warehouse_stock_movements",
+  {
+    id: bigserial("id", { mode: "number" }).primaryKey(),
+    warehouseId: bigint("warehouseId", { mode: "number" }).notNull(),
+    companyId: bigint("companyId", { mode: "number" }).notNull(),
+    productId: bigint("productId", { mode: "number" }).notNull(),
+    inventoryId: bigint("inventoryId", { mode: "number" }).notNull(),
+    type: warehouseMovementTypeEnum("type").notNull(),
+    quantity: integer("quantity").notNull(),
+    supplierName: varchar("supplierName", { length: 255 }),
+    orderId: bigint("orderId", { mode: "number" }),
+    reference: varchar("reference", { length: 120 }),
+    notes: text("notes"),
+    performedByUserId: bigint("performedByUserId", { mode: "number" }).notNull(),
+    createdAt: timestamp("createdAt").defaultNow().notNull(),
+  },
+  (table) => ({
+    warehouseIdx: index("warehouse_movement_warehouse_idx").on(table.warehouseId),
+    companyIdx: index("warehouse_movement_company_idx").on(table.companyId),
+    productIdx: index("warehouse_movement_product_idx").on(table.productId),
+    typeIdx: index("warehouse_movement_type_idx").on(table.type),
+    createdAtIdx: index("warehouse_movement_created_at_idx").on(table.createdAt),
+  })
+);
+
+export type WarehouseStockMovement = typeof warehouseStockMovements.$inferSelect;
+export type InsertWarehouseStockMovement = typeof warehouseStockMovements.$inferInsert;

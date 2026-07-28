@@ -13,6 +13,12 @@ import {
   ne,
 } from "drizzle-orm";
 
+function withoutUndefined<T extends Record<string, unknown>>(data: T) {
+  return Object.fromEntries(
+    Object.entries(data).filter(([, value]) => value !== undefined),
+  ) as Partial<T>;
+}
+
 // ─── Product Queries ───
 
 export async function findAllProducts(filters?: {
@@ -100,10 +106,22 @@ export async function findAllProducts(filters?: {
       updatedAt: products.updatedAt,
       categoryName: categories.name,
       supplierName: companies.name,
+      stock: inventory.quantityAvailable,
+      quantityOnHand: inventory.quantityOnHand,
+      quantityReserved: inventory.quantityReserved,
+      reorderLevel: inventory.reorderLevel,
+      inventoryStatus: inventory.status,
     })
     .from(products)
     .leftJoin(categories, eq(products.categoryId, categories.id))
     .leftJoin(companies, eq(products.supplierId, companies.id))
+    .leftJoin(
+      inventory,
+      and(
+        eq(inventory.productId, products.id),
+        eq(inventory.supplierId, products.supplierId),
+      ),
+    )
     .where(conditions.length ? and(...conditions) : undefined)
     .orderBy(orderByCol);
 }
@@ -142,10 +160,29 @@ export async function findProductBySlug(slug: string) {
       categorySlug: categories.slug,
       supplierName: companies.name,
       supplierSlug: companies.slug,
+      supplierPhone: companies.phone,
+      supplierAddressLine1: companies.addressLine1,
+      supplierAddressLine2: companies.addressLine2,
+      supplierCity: companies.city,
+      supplierState: companies.state,
+      supplierPostalCode: companies.postalCode,
+      supplierCountry: companies.country,
+      stock: inventory.quantityAvailable,
+      quantityOnHand: inventory.quantityOnHand,
+      quantityReserved: inventory.quantityReserved,
+      reorderLevel: inventory.reorderLevel,
+      inventoryStatus: inventory.status,
     })
     .from(products)
     .leftJoin(categories, eq(products.categoryId, categories.id))
     .leftJoin(companies, eq(products.supplierId, companies.id))
+    .leftJoin(
+      inventory,
+      and(
+        eq(inventory.productId, products.id),
+        eq(inventory.supplierId, products.supplierId),
+      ),
+    )
     .where(eq(products.slug, slug))
     .limit(1);
 
@@ -170,8 +207,12 @@ export async function createProductWithInventory(input: {
   product: InsertProduct;
   inventory: {
     quantityOnHand: number;
+    quantityReserved?: number;
+    quantityAvailable?: number;
     reorderLevel: number;
+    reorderQuantity?: number;
     warehouseLocation?: string;
+    batchNumber?: string;
     notes?: string;
   };
 }) {
@@ -183,11 +224,14 @@ export async function createProductWithInventory(input: {
       .returning({ id: products.id });
     const productId = productResult[0].id;
     const quantityOnHand = input.inventory.quantityOnHand;
+    const quantityReserved = input.inventory.quantityReserved ?? 0;
+    const quantityAvailable =
+      input.inventory.quantityAvailable ?? Math.max(0, quantityOnHand - quantityReserved);
     const reorderLevel = input.inventory.reorderLevel;
     const status =
-      quantityOnHand <= 0
+      quantityAvailable <= 0
         ? "out_of_stock"
-        : quantityOnHand <= reorderLevel
+        : quantityAvailable <= reorderLevel
           ? "low_stock"
           : "in_stock";
 
@@ -195,11 +239,12 @@ export async function createProductWithInventory(input: {
       productId,
       supplierId: input.product.supplierId,
       quantityOnHand,
-      quantityReserved: 0,
-      quantityAvailable: quantityOnHand,
+      quantityReserved,
+      quantityAvailable,
       reorderLevel,
-      reorderQuantity: Math.max(reorderLevel * 2, 1),
+      reorderQuantity: input.inventory.reorderQuantity ?? Math.max(reorderLevel * 2, 1),
       warehouseLocation: input.inventory.warehouseLocation,
+      batchNumber: input.inventory.batchNumber,
       receivedDate: new Date(),
       lastCountedAt: new Date(),
       status,
@@ -211,9 +256,12 @@ export async function createProductWithInventory(input: {
 }
 
 export async function updateProduct(id: number, data: Partial<InsertProduct>) {
+  const updates = withoutUndefined({ ...data, updatedAt: new Date() });
+  if (Object.keys(updates).length === 0) return;
+
   await getDb()
     .update(products)
-    .set({ ...data, updatedAt: new Date() })
+    .set(updates)
     .where(eq(products.id, id));
 }
 
@@ -291,10 +339,19 @@ export async function findFeaturedProducts(limit = 8) {
       organic: products.organic,
       categoryName: categories.name,
       supplierName: companies.name,
+      stock: inventory.quantityAvailable,
+      inventoryStatus: inventory.status,
     })
     .from(products)
     .leftJoin(categories, eq(products.categoryId, categories.id))
     .leftJoin(companies, eq(products.supplierId, companies.id))
+    .leftJoin(
+      inventory,
+      and(
+        eq(inventory.productId, products.id),
+        eq(inventory.supplierId, products.supplierId),
+      ),
+    )
     .where(eq(products.status, "active"))
     .orderBy(desc(products.createdAt))
     .limit(limit);

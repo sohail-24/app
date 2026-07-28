@@ -1,114 +1,435 @@
-import { useAuth } from "@/hooks/useAuth";
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
-import { Avatar, AvatarFallback } from "@/components/ui/avatar";
-import { Badge } from "@/components/ui/badge";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { toast } from "sonner";
+import { useTheme } from "next-themes";
+import { trpc } from "@/providers/trpc";
+import { getAppRole, getRoleLabel } from "@/lib/roles";
+import { formatDate } from "@/lib/i18n";
+import { indianStates } from "@/lib/freshflowData";
 import {
-  User,
-  Mail,
-  Shield,
-  Building2,
-  Calendar,
-} from "lucide-react";
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Skeleton } from "@/components/ui/skeleton";
+import { AlertCircle, Camera, KeyRound, Save, Trash2 } from "lucide-react";
+
+type Gender = "male" | "female" | "other" | "prefer_not_to_say";
+type ThemePreference = "system" | "light" | "dark";
+
+type ProfileForm = {
+  name: string;
+  phone: string;
+  dateOfBirth: string;
+  gender: Gender | "";
+  addressLine1: string;
+  city: string;
+  state: string;
+  country: string;
+  postalCode: string;
+  themePreference: ThemePreference;
+};
+
+const emptyForm: ProfileForm = {
+  name: "",
+  phone: "",
+  dateOfBirth: "",
+  gender: "",
+  addressLine1: "",
+  city: "",
+  state: "",
+  country: "India",
+  postalCode: "",
+  themePreference: "system",
+};
 
 export default function Profile() {
-  const { user } = useAuth();
+  const utils = trpc.useUtils();
+  const { setTheme } = useTheme();
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
+  const [form, setForm] = useState<ProfileForm>(emptyForm);
+  const [passwordOpen, setPasswordOpen] = useState(false);
+  const [passwordForm, setPasswordForm] = useState({
+    currentPassword: "",
+    newPassword: "",
+    confirmPassword: "",
+  });
 
-  if (!user) {
+  const profileQuery = trpc.profile.current.useQuery(undefined, { retry: false });
+  const profile = profileQuery.data;
+
+  useEffect(() => {
+    if (!profile) return;
+    setForm({
+      name: profile.name ?? "",
+      phone: profile.phone ?? "",
+      dateOfBirth: profile.dateOfBirth ? new Date(profile.dateOfBirth).toISOString().slice(0, 10) : "",
+      gender: (profile.gender as Gender | null) ?? "",
+      addressLine1: profile.addressLine1 ?? "",
+      city: profile.city ?? "",
+      state: profile.state ?? "",
+      country: profile.country ?? "India",
+      postalCode: profile.postalCode ?? "",
+      themePreference: (profile.themePreference as ThemePreference | null) ?? "system",
+    });
+  }, [profile]);
+
+  const originalForm = useMemo<ProfileForm>(() => {
+    if (!profile) return emptyForm;
+    return {
+      name: profile.name ?? "",
+      phone: profile.phone ?? "",
+      dateOfBirth: profile.dateOfBirth ? new Date(profile.dateOfBirth).toISOString().slice(0, 10) : "",
+      gender: (profile.gender as Gender | null) ?? "",
+      addressLine1: profile.addressLine1 ?? "",
+      city: profile.city ?? "",
+      state: profile.state ?? "",
+      country: profile.country ?? "India",
+      postalCode: profile.postalCode ?? "",
+      themePreference: (profile.themePreference as ThemePreference | null) ?? "system",
+    };
+  }, [profile]);
+  const dirty = JSON.stringify(form) !== JSON.stringify(originalForm);
+
+  const updateProfile = trpc.profile.update.useMutation({
+    onSuccess: async (updated) => {
+      await Promise.all([utils.profile.current.invalidate(), utils.auth.me.invalidate()]);
+      setTheme(updated.themePreference ?? "system");
+      toast.success("Profile updated.");
+    },
+    onError: (error) => toast.error(error.message || "Could not update profile."),
+  });
+
+  const uploadAvatar = trpc.profile.uploadAvatar.useMutation({
+    onSuccess: async () => {
+      await Promise.all([utils.profile.current.invalidate(), utils.auth.me.invalidate()]);
+      toast.success("Profile photo updated.");
+    },
+    onError: (error) => toast.error(error.message || "Could not upload avatar."),
+  });
+
+  const deleteAvatar = trpc.profile.deleteAvatar.useMutation({
+    onSuccess: async () => {
+      await Promise.all([utils.profile.current.invalidate(), utils.auth.me.invalidate()]);
+      toast.success("Profile photo removed.");
+    },
+    onError: (error) => toast.error(error.message || "Could not remove avatar."),
+  });
+
+  const changePassword = trpc.profile.changePassword.useMutation({
+    onSuccess: () => {
+      toast.success("Password updated.");
+      setPasswordOpen(false);
+      setPasswordForm({ currentPassword: "", newPassword: "", confirmPassword: "" });
+    },
+    onError: (error) => toast.error(error.message || "Could not update password."),
+  });
+
+  if (profileQuery.isLoading) {
+    return <ProfileSkeleton />;
+  }
+
+  if (!profile || profileQuery.isError) {
     return (
-      <div className="text-center py-16">
-        <User className="h-12 w-12 mx-auto text-muted-foreground/40 mb-4" />
-        <h2 className="text-xl font-semibold mb-2">Not Authenticated</h2>
-        <p className="text-muted-foreground">Please sign in to view your profile</p>
+      <div className="mx-auto max-w-3xl py-16">
+        <Alert variant="destructive">
+          <AlertCircle className="h-4 w-4" />
+          <AlertTitle>Unable to load your profile</AlertTitle>
+          <AlertDescription>{profileQuery.error?.message ?? "Please try again."}</AlertDescription>
+        </Alert>
+        <Button className="mt-4" variant="outline" onClick={() => profileQuery.refetch()}>Retry</Button>
       </div>
     );
   }
 
+  const initials = (profile.name ?? profile.email ?? "User")
+    .split(" ")
+    .map((part) => part[0])
+    .join("")
+    .slice(0, 2)
+    .toUpperCase();
+
+  function saveProfile() {
+    updateProfile.mutate({
+      name: form.name.trim(),
+      phone: form.phone.trim() || null,
+      dateOfBirth: form.dateOfBirth || null,
+      gender: form.gender || null,
+      addressLine1: form.addressLine1.trim() || null,
+      city: form.city.trim() || null,
+      state: form.state || null,
+      country: form.country.trim() || null,
+      postalCode: form.postalCode.trim() || null,
+      themePreference: form.themePreference,
+    });
+  }
+
+  function handleAvatarFile(file?: File) {
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = () => {
+      if (typeof reader.result === "string") {
+        uploadAvatar.mutate({ avatar: reader.result });
+      }
+    };
+    reader.readAsDataURL(file);
+  }
+
   return (
-    <div className="max-w-2xl mx-auto space-y-6">
-      <div>
-        <h1 className="text-2xl font-bold tracking-tight">Profile</h1>
-        <p className="text-muted-foreground text-sm mt-0.5">
-          Your account information
-        </p>
+    <div className="mx-auto flex w-full max-w-[1100px] flex-col gap-5">
+      <section>
+        <p className="text-sm text-muted-foreground">Account / Profile</p>
+        <h1 className="text-2xl font-semibold tracking-tight sm:text-3xl">User Profile</h1>
+        <p className="mt-1 text-sm text-muted-foreground">Manage your personal account information.</p>
+      </section>
+
+      <Card>
+        <CardContent className="flex flex-col items-center gap-4 p-6 text-center sm:flex-row sm:text-left">
+          <Avatar className="h-24 w-24 border">
+            <AvatarImage src={profile.avatar ?? undefined} alt={profile.name ?? "Profile photo"} />
+            <AvatarFallback className="text-2xl">{initials}</AvatarFallback>
+          </Avatar>
+          <div className="min-w-0 flex-1">
+            <h2 className="text-xl font-semibold">{profile.name || "User"}</h2>
+            <div className="mt-2 flex flex-wrap justify-center gap-2 sm:justify-start">
+              <Badge variant="secondary" className="rounded-md">{getRoleLabel(getAppRole(profile))}</Badge>
+              <Badge variant="outline" className="rounded-md">{profile.email ?? "No email"}</Badge>
+            </div>
+          </div>
+          <div className="flex flex-wrap justify-center gap-2 sm:justify-end">
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept="image/png,image/jpeg,image/webp"
+              className="hidden"
+              onChange={(event) => handleAvatarFile(event.target.files?.[0])}
+            />
+            <Button variant="outline" onClick={() => fileInputRef.current?.click()} disabled={uploadAvatar.isPending}>
+              <Camera className="mr-2 h-4 w-4" />
+              Upload Photo
+            </Button>
+            {profile.avatar && (
+              <AlertDialog>
+                <AlertDialogTrigger asChild>
+                  <Button variant="outline" disabled={deleteAvatar.isPending}>
+                    <Trash2 className="mr-2 h-4 w-4" />
+                    Remove Photo
+                  </Button>
+                </AlertDialogTrigger>
+                <AlertDialogContent>
+                  <AlertDialogHeader>
+                    <AlertDialogTitle>Remove profile photo?</AlertDialogTitle>
+                    <AlertDialogDescription>The default avatar will be displayed automatically.</AlertDialogDescription>
+                  </AlertDialogHeader>
+                  <AlertDialogFooter>
+                    <AlertDialogCancel>Cancel</AlertDialogCancel>
+                    <AlertDialogAction onClick={() => deleteAvatar.mutate()}>Remove Photo</AlertDialogAction>
+                  </AlertDialogFooter>
+                </AlertDialogContent>
+              </AlertDialog>
+            )}
+          </div>
+        </CardContent>
+      </Card>
+
+      <section className="grid gap-4 lg:grid-cols-2">
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-base">Personal Information</CardTitle>
+            <CardDescription>Email is read-only in Version 1.0.</CardDescription>
+          </CardHeader>
+          <CardContent className="grid gap-4 sm:grid-cols-2">
+            <Field label="Full Name" required>
+              <Input value={form.name} onChange={(event) => setForm({ ...form, name: event.target.value })} />
+            </Field>
+            <Field label="Email">
+              <Input value={profile.email ?? ""} readOnly className="bg-muted/40" />
+            </Field>
+            <Field label="Mobile Number">
+              <Input value={form.phone} onChange={(event) => setForm({ ...form, phone: event.target.value })} placeholder="+91..." />
+            </Field>
+            <Field label="Date of Birth">
+              <Input type="date" value={form.dateOfBirth} onChange={(event) => setForm({ ...form, dateOfBirth: event.target.value })} />
+            </Field>
+            <Field label="Gender">
+              <Select value={form.gender || "unset"} onValueChange={(value) => setForm({ ...form, gender: value === "unset" ? "" : value as Gender })}>
+                <SelectTrigger><SelectValue placeholder="Select gender" /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="unset">Not set</SelectItem>
+                  <SelectItem value="male">Male</SelectItem>
+                  <SelectItem value="female">Female</SelectItem>
+                  <SelectItem value="other">Other</SelectItem>
+                  <SelectItem value="prefer_not_to_say">Prefer not to say</SelectItem>
+                </SelectContent>
+              </Select>
+            </Field>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-base">Contact Information</CardTitle>
+            <CardDescription>Personal address only. Company details stay in Company settings.</CardDescription>
+          </CardHeader>
+          <CardContent className="grid gap-4 sm:grid-cols-2">
+            <Field label="Address Line">
+              <Input value={form.addressLine1} onChange={(event) => setForm({ ...form, addressLine1: event.target.value })} />
+            </Field>
+            <Field label="City">
+              <Input value={form.city} onChange={(event) => setForm({ ...form, city: event.target.value })} />
+            </Field>
+            <Field label="State">
+              <Select value={form.state || "unset"} onValueChange={(value) => setForm({ ...form, state: value === "unset" ? "" : value })}>
+                <SelectTrigger><SelectValue placeholder="Select state" /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="unset">Not set</SelectItem>
+                  {indianStates.map((state) => <SelectItem key={state} value={state}>{state}</SelectItem>)}
+                </SelectContent>
+              </Select>
+            </Field>
+            <Field label="Country">
+              <Input value={form.country} onChange={(event) => setForm({ ...form, country: event.target.value })} />
+            </Field>
+            <Field label="Postal Code">
+              <Input value={form.postalCode} onChange={(event) => setForm({ ...form, postalCode: event.target.value })} />
+            </Field>
+          </CardContent>
+        </Card>
+      </section>
+
+      <section className="grid gap-4 lg:grid-cols-2">
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-base">Security</CardTitle>
+            <CardDescription>Review account dates and update your password.</CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <ReadOnly label="Last Login" value={formatDate(profile.lastSignInAt)} />
+            <ReadOnly label="Account Created" value={formatDate(profile.createdAt)} />
+            <Dialog open={passwordOpen} onOpenChange={setPasswordOpen}>
+              <DialogTrigger asChild>
+                <Button variant="outline">
+                  <KeyRound className="mr-2 h-4 w-4" />
+                  Change Password
+                </Button>
+              </DialogTrigger>
+              <DialogContent>
+                <DialogHeader>
+                  <DialogTitle>Change Password</DialogTitle>
+                  <DialogDescription>Enter your current password before choosing a new one.</DialogDescription>
+                </DialogHeader>
+                <div className="space-y-4">
+                  <Field label="Current Password" required>
+                    <Input type="password" value={passwordForm.currentPassword} onChange={(event) => setPasswordForm({ ...passwordForm, currentPassword: event.target.value })} />
+                  </Field>
+                  <Field label="New Password" required>
+                    <Input type="password" value={passwordForm.newPassword} onChange={(event) => setPasswordForm({ ...passwordForm, newPassword: event.target.value })} />
+                  </Field>
+                  <Field label="Confirm Password" required>
+                    <Input type="password" value={passwordForm.confirmPassword} onChange={(event) => setPasswordForm({ ...passwordForm, confirmPassword: event.target.value })} />
+                  </Field>
+                </div>
+                <DialogFooter>
+                  <Button variant="outline" onClick={() => setPasswordOpen(false)}>Cancel</Button>
+                  <Button onClick={() => changePassword.mutate(passwordForm)} disabled={changePassword.isPending}>
+                    Update Password
+                  </Button>
+                </DialogFooter>
+              </DialogContent>
+            </Dialog>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-base">Preferences</CardTitle>
+            <CardDescription>Personal display preferences.</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <RadioGroup
+              value={form.themePreference}
+              onValueChange={(value) => setForm({ ...form, themePreference: value as ThemePreference })}
+              className="grid gap-3 sm:grid-cols-3"
+            >
+              {(["system", "light", "dark"] as ThemePreference[]).map((theme) => (
+                <Label key={theme} className="flex cursor-pointer items-center gap-2 rounded-lg border p-3 capitalize">
+                  <RadioGroupItem value={theme} />
+                  {theme}
+                </Label>
+              ))}
+            </RadioGroup>
+          </CardContent>
+        </Card>
+      </section>
+
+      <Card className="sticky bottom-3 z-10 shadow-sm">
+        <CardContent className="flex flex-col gap-2 p-3 sm:flex-row sm:justify-end">
+          <Button variant="outline" disabled={!dirty || updateProfile.isPending} onClick={() => setForm(originalForm)}>
+            Cancel
+          </Button>
+          <Button disabled={!dirty || updateProfile.isPending} onClick={saveProfile}>
+            <Save className="mr-2 h-4 w-4" />
+            Save Changes
+          </Button>
+        </CardContent>
+      </Card>
+    </div>
+  );
+}
+
+function Field({ label, required, children }: { label: string; required?: boolean; children: React.ReactNode }) {
+  return (
+    <div className="space-y-2">
+      <Label>
+        {label}
+        {required && <span className="ml-1 text-destructive">*</span>}
+      </Label>
+      {children}
+    </div>
+  );
+}
+
+function ReadOnly({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="rounded-lg border bg-muted/20 p-3 text-sm">
+      <p className="text-muted-foreground">{label}</p>
+      <p className="mt-1 font-medium">{value}</p>
+    </div>
+  );
+}
+
+function ProfileSkeleton() {
+  return (
+    <div className="mx-auto flex w-full max-w-[1100px] flex-col gap-5">
+      <Skeleton className="h-10 w-72" />
+      <Skeleton className="h-40" />
+      <div className="grid gap-4 lg:grid-cols-2">
+        <Skeleton className="h-80" />
+        <Skeleton className="h-80" />
       </div>
-
-      {/* Profile Card */}
-      <Card>
-        <CardContent className="p-6">
-          <div className="flex items-center gap-4">
-            <Avatar className="h-20 w-20 border-2 border-emerald-100">
-              <AvatarFallback className="text-2xl bg-emerald-100 text-emerald-700">
-                {user.name?.charAt(0).toUpperCase() ?? "U"}
-              </AvatarFallback>
-            </Avatar>
-            <div>
-              <h2 className="text-xl font-semibold">{user.name || "User"}</h2>
-              <div className="flex items-center gap-2 mt-1">
-                <Badge variant={user.role === "admin" ? "default" : "secondary"} className="text-xs">
-                  {user.role === "admin" ? (
-                    <>
-                      <Shield className="mr-1 h-3 w-3" />
-                      Administrator
-                    </>
-                  ) : (
-                    "Member"
-                  )}
-                </Badge>
-              </div>
-            </div>
-          </div>
-        </CardContent>
-      </Card>
-
-      {/* Details */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-base">Account Details</CardTitle>
-          <CardDescription>Your personal and contact information</CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="grid sm:grid-cols-2 gap-4">
-            <div className="flex items-center gap-3 p-3 rounded-lg bg-muted/50">
-              <Mail className="h-4 w-4 text-muted-foreground shrink-0" />
-              <div>
-                <p className="text-xs text-muted-foreground">Email</p>
-                <p className="text-sm font-medium">{user.email ?? "Not provided"}</p>
-              </div>
-            </div>
-            <div className="flex items-center gap-3 p-3 rounded-lg bg-muted/50">
-              <Building2 className="h-4 w-4 text-muted-foreground shrink-0" />
-              <div>
-                <p className="text-xs text-muted-foreground">Company ID</p>
-                <p className="text-sm font-medium">
-                  {user.companyId ?? "Not assigned"}
-                </p>
-              </div>
-            </div>
-            <div className="flex items-center gap-3 p-3 rounded-lg bg-muted/50">
-              <User className="h-4 w-4 text-muted-foreground shrink-0" />
-              <div>
-                <p className="text-xs text-muted-foreground">User ID</p>
-                <p className="text-sm font-medium">{user.id}</p>
-              </div>
-            </div>
-            <div className="flex items-center gap-3 p-3 rounded-lg bg-muted/50">
-              <Calendar className="h-4 w-4 text-muted-foreground shrink-0" />
-              <div>
-                <p className="text-xs text-muted-foreground">Member Since</p>
-                <p className="text-sm font-medium">
-                  {user.createdAt
-                    ? new Date(user.createdAt).toLocaleDateString("en-US", {
-                        year: "numeric",
-                        month: "long",
-                        day: "numeric",
-                      })
-                    : "N/A"}
-                </p>
-              </div>
-            </div>
-          </div>
-        </CardContent>
-      </Card>
     </div>
   );
 }

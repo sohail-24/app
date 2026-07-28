@@ -2,6 +2,12 @@ import { getDb } from "./connection";
 import { inventory, products, companies, type InsertInventory } from "@db/schema";
 import { eq, and, sql, asc } from "drizzle-orm";
 
+function withoutUndefined<T extends Record<string, unknown>>(data: T) {
+  return Object.fromEntries(
+    Object.entries(data).filter(([, value]) => value !== undefined),
+  ) as Partial<T>;
+}
+
 export async function findAllInventory(filters?: {
   supplierId?: number;
   status?: string;
@@ -63,6 +69,16 @@ export async function findInventoryByProduct(productId: number) {
   });
 }
 
+export async function findInventoryById(id: number) {
+  return getDb().query.inventory.findFirst({
+    where: eq(inventory.id, id),
+    with: {
+      product: true,
+      supplier: true,
+    },
+  });
+}
+
 export async function findInventoryBySupplier(supplierId: number) {
   return findAllInventory({ supplierId });
 }
@@ -70,6 +86,7 @@ export async function findInventoryBySupplier(supplierId: number) {
 export async function updateInventory(
   id: number,
   data: Partial<{
+    supplierId: number;
     quantityOnHand: number;
     quantityReserved: number;
     quantityAvailable: number;
@@ -78,15 +95,32 @@ export async function updateInventory(
     warehouseLocation: string;
     batchNumber: string;
     expiryDate: Date;
+    receivedDate: Date;
+    lastCountedAt: Date;
     notes: string;
     status: "in_stock" | "low_stock" | "out_of_stock";
   }>
 ) {
   const db = getDb();
-  await db
-    .update(inventory)
-    .set({ ...data, updatedAt: new Date() })
-    .where(eq(inventory.id, id));
+  const updates = withoutUndefined({ ...data, updatedAt: new Date() });
+  if (Object.keys(updates).length === 0) return;
+
+  await db.transaction(async (tx) => {
+    const [existing] = await tx
+      .select({ productId: inventory.productId })
+      .from(inventory)
+      .where(eq(inventory.id, id))
+      .limit(1);
+
+    await tx.update(inventory).set(updates).where(eq(inventory.id, id));
+
+    if (data.supplierId !== undefined && existing) {
+      await tx
+        .update(products)
+        .set({ supplierId: data.supplierId, updatedAt: new Date() })
+        .where(eq(products.id, existing.productId));
+    }
+  });
 }
 
 export async function createInventoryRecord(data: InsertInventory) {

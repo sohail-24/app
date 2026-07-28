@@ -26,9 +26,11 @@ import {
   Boxes,
   ImagePlus,
   IndianRupee,
+  Leaf,
   Package,
   Save,
   Star,
+  Tag,
   UploadCloud,
   Warehouse,
   X,
@@ -55,16 +57,31 @@ export default function AddProduct() {
     sku: "",
     barcode: "",
     categoryId: "",
+    supplierId: "",
     description: "",
     purchasePrice: "",
+    wholesalePrice: "",
     sellingPrice: "",
+    discount: "0",
     openingStock: "0",
+    availableStock: "",
+    reservedStock: "0",
     minimumStock: "10",
+    reorderQuantity: "100",
     warehouse: "Main Warehouse",
+    batchNumber: "",
+    unitType: "kg",
+    unitSize: "",
+    minimumOrderQuantity: "1",
+    grade: "grade_a",
+    organic: false,
+    tags: "",
   });
 
   const utils = trpc.useUtils();
   const categoriesQuery = trpc.category.list.useQuery(undefined, { retry: false });
+  const companiesQuery = trpc.company.list.useQuery(undefined, { retry: false });
+  const suppliers = (companiesQuery.data ?? []).filter((company) => company.type === "supplier" || company.type === "both");
   const activeCategories = categoriesQuery.data ?? [];
   const createProduct = trpc.product.create.useMutation({
     onSuccess: async () => {
@@ -94,6 +111,8 @@ export default function AddProduct() {
     purchasePrice: toNumber(form.purchasePrice) > 0 ? "" : "Purchase price must be greater than zero.",
     sellingPrice: toNumber(form.sellingPrice) > 0 ? "" : "Selling price must be greater than zero.",
     warehouse: form.warehouse.trim() ? "" : "Warehouse is required.",
+    supplierId: form.supplierId ? "" : "Supplier is required.",
+    minimumOrderQuantity: toNumber(form.minimumOrderQuantity) > 0 ? "" : "MOQ must be greater than zero.",
   };
   const isFormValid = Object.values(errors).every((error) => !error);
 
@@ -102,6 +121,12 @@ export default function AddProduct() {
       imageUrlsRef.current.forEach((url) => URL.revokeObjectURL(url));
     };
   }, []);
+
+  useEffect(() => {
+    if (!form.supplierId && suppliers[0]) {
+      setForm((current) => ({ ...current, supplierId: String(suppliers[0].id) }));
+    }
+  }, [form.supplierId, suppliers]);
 
   const updateField = (field: keyof typeof form, value: string) => {
     setForm((current) => ({ ...current, [field]: value }));
@@ -163,14 +188,29 @@ export default function AddProduct() {
       sku: form.sku,
       barcode: form.barcode || undefined,
       categoryId: Number(form.categoryId),
+      supplierId: Number(form.supplierId),
       description: form.description || undefined,
       purchasePrice: toNumber(form.purchasePrice),
+      wholesalePrice: form.wholesalePrice ? toNumber(form.wholesalePrice) : undefined,
       sellingPrice: toNumber(form.sellingPrice),
+      discount: toNumber(form.discount),
       openingStock: Math.max(0, Math.floor(toNumber(form.openingStock))),
+      availableStock: form.availableStock.trim()
+        ? Math.max(0, Math.floor(toNumber(form.availableStock)))
+        : undefined,
+      reservedStock: Math.max(0, Math.floor(toNumber(form.reservedStock))),
       minimumStock: Math.max(0, Math.floor(toNumber(form.minimumStock))),
+      reorderQuantity: Math.max(0, Math.floor(toNumber(form.reorderQuantity))),
       warehouse: form.warehouse,
+      batchNumber: form.batchNumber || undefined,
       status,
+      unitType: form.unitType as any,
+      unitSize: form.unitSize || undefined,
+      minimumOrderQuantity: Math.max(1, Math.floor(toNumber(form.minimumOrderQuantity))),
+      grade: form.grade as any,
+      organic: form.organic,
       images: orderedImages.map((image) => image.url),
+      tags: form.tags.split(",").map((tag) => tag.trim()).filter(Boolean),
     });
   };
 
@@ -244,6 +284,20 @@ export default function AddProduct() {
                   </div>
                 )}
               </Field>
+              <Field label="Supplier" required error={attemptedSubmit ? errors.supplierId : ""}>
+                <Select value={form.supplierId} onValueChange={(value) => updateField("supplierId", value)}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select supplier" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {suppliers.map((supplier) => (
+                      <SelectItem key={supplier.id} value={String(supplier.id)}>
+                        {supplier.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </Field>
               <Field label="SKU" required error={attemptedSubmit ? errors.sku : ""}>
                 <Input value={form.sku} onChange={(event) => updateField("sku", event.target.value)} placeholder="FRU-MANG-0001" />
               </Field>
@@ -262,6 +316,56 @@ export default function AddProduct() {
                     className="min-h-28"
                   />
                 </Field>
+              </div>
+              <div className="md:col-span-2">
+                <Field label="Tags">
+                  <Input value={form.tags} onChange={(event) => updateField("tags", event.target.value)} placeholder="seasonal, bulk, premium" />
+                </Field>
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2 text-base">
+                <Tag className="h-4 w-4" />
+                Wholesale Selling Rules
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="grid gap-4 md:grid-cols-3">
+              <Field label="Unit">
+                <Select value={form.unitType} onValueChange={(value) => updateField("unitType", value)}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    {["kg", "box", "case", "bag", "lb", "pallet", "bunch", "each"].map((unit) => (
+                      <SelectItem key={unit} value={unit}>{unit}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </Field>
+              <Field label="Unit Size">
+                <Input value={form.unitSize} onChange={(event) => updateField("unitSize", event.target.value)} placeholder="5 kg crate" />
+              </Field>
+              <Field label="MOQ" required error={attemptedSubmit ? errors.minimumOrderQuantity : ""}>
+                <Input type="number" min="1" value={form.minimumOrderQuantity} onChange={(event) => updateField("minimumOrderQuantity", event.target.value)} />
+              </Field>
+              <Field label="Grade">
+                <Select value={form.grade} onValueChange={(value) => updateField("grade", value)}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="premium">Premium</SelectItem>
+                    <SelectItem value="grade_a">Grade A</SelectItem>
+                    <SelectItem value="grade_b">Grade B</SelectItem>
+                    <SelectItem value="standard">Standard</SelectItem>
+                  </SelectContent>
+                </Select>
+              </Field>
+              <div className="flex items-center justify-between rounded-lg border bg-card px-3 py-2">
+                <Label htmlFor="add-organic-switch" className="flex items-center gap-2 text-sm">
+                  <Leaf className="h-4 w-4 text-emerald-600" />
+                  Organic
+                </Label>
+                <Switch id="add-organic-switch" checked={form.organic} onCheckedChange={(checked) => setForm((current) => ({ ...current, organic: checked }))} />
               </div>
             </CardContent>
           </Card>
@@ -361,12 +465,18 @@ export default function AddProduct() {
                 Pricing
               </CardTitle>
             </CardHeader>
-            <CardContent className="grid gap-4 md:grid-cols-3">
+            <CardContent className="grid gap-4 md:grid-cols-4">
               <Field label="Purchase Price" required error={attemptedSubmit ? errors.purchasePrice : ""}>
                 <Input type="number" value={form.purchasePrice} onChange={(event) => updateField("purchasePrice", event.target.value)} placeholder="1200" />
               </Field>
+              <Field label="Wholesale Price">
+                <Input type="number" value={form.wholesalePrice} onChange={(event) => updateField("wholesalePrice", event.target.value)} placeholder="1400" />
+              </Field>
               <Field label="Selling Price" required error={attemptedSubmit ? errors.sellingPrice : ""}>
                 <Input type="number" value={form.sellingPrice} onChange={(event) => updateField("sellingPrice", event.target.value)} placeholder="1600" />
+              </Field>
+              <Field label="Discount %">
+                <Input type="number" min="0" max="100" value={form.discount} onChange={(event) => updateField("discount", event.target.value)} />
               </Field>
               <div className="rounded-lg border bg-muted/40 p-3">
                 <p className="text-sm text-muted-foreground">Gross Margin</p>
@@ -389,11 +499,23 @@ export default function AddProduct() {
               <Field label="Opening Stock">
                 <Input type="number" value={form.openingStock} onChange={(event) => updateField("openingStock", event.target.value)} />
               </Field>
+              <Field label="Available Stock">
+                <Input type="number" value={form.availableStock} onChange={(event) => updateField("availableStock", event.target.value)} />
+              </Field>
+              <Field label="Reserved Stock">
+                <Input type="number" value={form.reservedStock} onChange={(event) => updateField("reservedStock", event.target.value)} />
+              </Field>
               <Field label="Minimum Stock">
                 <Input type="number" value={form.minimumStock} onChange={(event) => updateField("minimumStock", event.target.value)} />
               </Field>
+              <Field label="Reorder Quantity">
+                <Input type="number" value={form.reorderQuantity} onChange={(event) => updateField("reorderQuantity", event.target.value)} />
+              </Field>
               <Field label="Warehouse" required error={attemptedSubmit ? errors.warehouse : ""}>
                 <Input value={form.warehouse} onChange={(event) => updateField("warehouse", event.target.value)} />
+              </Field>
+              <Field label="Batch Number">
+                <Input value={form.batchNumber} onChange={(event) => updateField("batchNumber", event.target.value)} />
               </Field>
             </CardContent>
           </Card>

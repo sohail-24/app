@@ -1,207 +1,283 @@
+import { useState } from "react";
+import type { ElementType, ReactNode } from "react";
 import { trpc } from "@/providers/trpc";
-import { formatCurrency } from "@/lib/i18n";
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
+import { formatCurrency, formatDate, formatNumber } from "@/lib/i18n";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { Badge } from "@/components/ui/badge";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import {
-  BarChart3,
-  TrendingUp,
-  ShoppingCart,
-  Package,
+  AlertCircle,
+  ClipboardList,
+  FileText,
   IndianRupee,
-  ArrowDownRight,
+  Package,
+  Warehouse,
 } from "lucide-react";
 
+type ReportPeriod = "today" | "this_week" | "this_month";
+
+type ProductPerformance = {
+  productId: number;
+  productName: string;
+  quantitySold: number;
+  revenue: number;
+};
+
+const periodLabels: Record<ReportPeriod, string> = {
+  today: "Today",
+  this_week: "This Week",
+  this_month: "This Month",
+};
+
 export default function Reports() {
-  const cartQuery = trpc.cart.list.useQuery(undefined, { retry: false });
-  const recentOrdersQuery = trpc.order.recent.useQuery({ limit: 10 }, { retry: false });
-  const inventoryStatsQuery = trpc.inventory.stats.useQuery(undefined, { retry: false });
-  const productsQuery = trpc.product.list.useQuery({});
-
-  const isLoading = cartQuery.isLoading || recentOrdersQuery.isLoading || inventoryStatsQuery.isLoading;
-
-  const cartTotal = cartQuery.data?.total ?? 0;
-  const orderCount = recentOrdersQuery.data?.length ?? 0;
-  const orderTotal = (recentOrdersQuery.data ?? []).reduce(
-    (sum, o) => sum + parseFloat(o.totalAmount?.toString() ?? "0"),
-    0
-  );
-  const inventoryTotal = inventoryStatsQuery.data?.totalItems ?? 0;
-  const lowStockCount = inventoryStatsQuery.data?.lowStock ?? 0;
-  const productCount = productsQuery.data?.length ?? 0;
+  const [period, setPeriod] = useState<ReportPeriod>("today");
+  const summaryQuery = trpc.report.businessSummary.useQuery({ period }, { retry: false });
+  const summary = summaryQuery.data;
 
   return (
-    <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-bold tracking-tight">Reports</h1>
-        <p className="text-muted-foreground text-sm mt-0.5">
-          Overview of your marketplace metrics
-        </p>
-      </div>
+    <div className="mx-auto flex w-full max-w-[1500px] flex-col gap-5">
+      <section className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
+        <div>
+          <p className="text-sm text-muted-foreground">Dashboard / Reports</p>
+          <h1 className="text-2xl font-semibold tracking-tight sm:text-3xl">Reports</h1>
+          <p className="mt-1 max-w-2xl text-sm text-muted-foreground">
+            Read-only business intelligence from products, inventory, orders, and invoices.
+          </p>
+        </div>
+        <Select value={period} onValueChange={(value) => setPeriod(value as ReportPeriod)}>
+          <SelectTrigger className="w-full sm:w-[220px]">
+            <SelectValue placeholder="Reporting period" />
+          </SelectTrigger>
+          <SelectContent>
+            {Object.entries(periodLabels).map(([value, label]) => (
+              <SelectItem key={value} value={value}>{label}</SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      </section>
 
-      {/* KPI Cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        {[
-          {
-            title: "Cart Value",
-            value: formatCurrency(cartTotal),
-            description: "Items in cart",
-            icon: ShoppingCart,
-            trend: null,
-          },
-          {
-            title: "Total Orders",
-            value: String(orderCount),
-            description: "Recent orders",
-            icon: Package,
-            trend: null,
-          },
-          {
-            title: "Order Value",
-            value: formatCurrency(orderTotal),
-            description: "Recent order total",
-            icon: IndianRupee,
-            trend: null,
-          },
-          {
-            title: "Products",
-            value: String(productCount),
-            description: "Active products",
-            icon: BarChart3,
-            trend: null,
-          },
-        ].map((kpi) => (
-          <Card key={kpi.title}>
-            <CardContent className="p-5">
-              <div className="flex items-start justify-between">
-                <div className="space-y-2">
-                  <p className="text-sm text-muted-foreground">{kpi.title}</p>
-                  {isLoading ? (
-                    <Skeleton className="h-8 w-20" />
-                  ) : (
-                    <p className="text-2xl font-bold">{kpi.value}</p>
-                  )}
-                  <p className="text-xs text-muted-foreground">{kpi.description}</p>
-                </div>
-                <div className="h-9 w-9 rounded-lg bg-muted flex items-center justify-center">
-                  <kpi.icon className="h-4 w-4 text-muted-foreground" />
-                </div>
+      {summaryQuery.isError && (
+        <Alert variant="destructive">
+          <AlertCircle className="h-4 w-4" />
+          <AlertTitle>Unable to load reports</AlertTitle>
+          <AlertDescription>{summaryQuery.error.message}</AlertDescription>
+        </Alert>
+      )}
+
+      {summaryQuery.isLoading ? (
+        <ReportsSkeleton />
+      ) : summary ? (
+        <>
+          <section className="grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
+            <KpiCard title="Revenue" value={formatCurrency(summary.dashboard.revenue)} description={periodLabels[period]} icon={IndianRupee} />
+            <KpiCard title="Orders" value={formatNumber(summary.dashboard.orders)} description="Orders received" icon={ClipboardList} />
+            <KpiCard title="Products" value={formatNumber(summary.dashboard.products)} description="Catalog products" icon={Package} />
+            <KpiCard title="Inventory" value={formatNumber(summary.dashboard.inventory)} description="Available stock" icon={Warehouse} />
+            <KpiCard title="Invoices" value={formatNumber(summary.dashboard.invoices)} description="Generated invoices" icon={FileText} />
+          </section>
+
+          <section className="grid gap-4 xl:grid-cols-2">
+            <ReportCard title="Sales Report" description="Revenue, order count, and average order value.">
+              <MetricRow label="Total Sales" value={formatCurrency(summary.sales.revenue)} />
+              <MetricRow label="Number of Orders" value={formatNumber(summary.sales.orderCount)} />
+              <MetricRow label="Average Order Value" value={formatCurrency(summary.sales.averageOrderValue)} />
+            </ReportCard>
+
+            <ReportCard title="Order Report" description="Operational order status summary.">
+              <MetricRow label="Total Orders" value={formatNumber(summary.orders.totalOrders)} />
+              <MetricRow label="Pending Orders" value={formatNumber(summary.orders.pendingOrders)} />
+              <MetricRow label="Confirmed Orders" value={formatNumber(summary.orders.confirmedOrders)} />
+              <MetricRow label="Delivered Orders" value={formatNumber(summary.orders.deliveredOrders)} />
+            </ReportCard>
+
+            <ReportCard title="Inventory Report" description="Available stock and restocking signals.">
+              <MetricRow label="Available Stock" value={formatNumber(summary.inventory.availableStock)} />
+              <MetricRow label="Low Stock Products" value={formatNumber(summary.inventory.lowStockProducts)} />
+              <MetricRow label="Out of Stock Products" value={formatNumber(summary.inventory.outOfStockProducts)} />
+              <LowStockList items={summary.inventory.lowStockItems} />
+            </ReportCard>
+
+            <ReportCard title="Invoice Report" description="Invoice counts and financial invoice activity.">
+              <MetricRow label="Total Invoices" value={formatNumber(summary.invoices.totalInvoices)} />
+              <MetricRow label="Daily Invoice Count" value={formatNumber(summary.invoices.dailyInvoiceCount)} />
+              <MetricRow label="Monthly Invoice Count" value={formatNumber(summary.invoices.monthlyInvoiceCount)} />
+              <MetricRow label="Invoice Total" value={formatCurrency(summary.invoices.invoiceTotal)} />
+            </ReportCard>
+          </section>
+
+          <section className="grid gap-4 xl:grid-cols-2">
+            <ProductTable title="Best Selling Products" products={summary.products.bestSellingProducts} empty="No best-selling product data available." />
+            <ProductTable title="Least Selling Products" products={summary.products.leastSellingProducts} empty="No slow-moving product data available." />
+          </section>
+
+          <ReportCard title="Recent Invoices" description="Latest generated financial records.">
+            {summary.invoices.recentInvoices.length ? (
+              <div className="overflow-x-auto">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Invoice</TableHead>
+                      <TableHead>Customer</TableHead>
+                      <TableHead>Date</TableHead>
+                      <TableHead className="text-right">Total</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {summary.invoices.recentInvoices.map((invoice) => (
+                      <TableRow key={invoice.invoiceNumber}>
+                        <TableCell className="font-medium">{invoice.invoiceNumber}</TableCell>
+                        <TableCell>{invoice.customerName}</TableCell>
+                        <TableCell>{formatDate(invoice.invoiceDate)}</TableCell>
+                        <TableCell className="text-right">{formatCurrency(invoice.totalAmount)}</TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
               </div>
-            </CardContent>
-          </Card>
+            ) : (
+              <EmptyInline message="No invoice data available." />
+            )}
+          </ReportCard>
+        </>
+      ) : (
+        <EmptyInline message="No report data available." />
+      )}
+    </div>
+  );
+}
+
+function KpiCard({
+  title,
+  value,
+  description,
+  icon: Icon,
+}: {
+  title: string;
+  value: string;
+  description: string;
+  icon: ElementType;
+}) {
+  return (
+    <Card>
+      <CardContent className="flex min-h-[120px] items-start justify-between gap-3 p-4">
+        <div>
+          <p className="text-sm text-muted-foreground">{title}</p>
+          <p className="mt-2 text-2xl font-semibold">{value}</p>
+          <p className="mt-1 text-xs text-muted-foreground">{description}</p>
+        </div>
+        <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary/10 text-primary">
+          <Icon className="h-5 w-5" />
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
+
+function ReportCard({ title, description, children }: { title: string; description: string; children: ReactNode }) {
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle className="text-base">{title}</CardTitle>
+        <CardDescription>{description}</CardDescription>
+      </CardHeader>
+      <CardContent className="space-y-3">{children}</CardContent>
+    </Card>
+  );
+}
+
+function MetricRow({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="flex items-center justify-between gap-4 rounded-lg border bg-muted/20 p-3 text-sm">
+      <span className="text-muted-foreground">{label}</span>
+      <span className="font-semibold">{value}</span>
+    </div>
+  );
+}
+
+function LowStockList({
+  items,
+}: {
+  items: Array<{ productId: number; productName: string | null; availableStock: number; status: string }>;
+}) {
+  if (!items.length) {
+    return <EmptyInline message="No low stock items." />;
+  }
+
+  return (
+    <div className="space-y-2">
+      <p className="text-sm font-medium">Low Stock Items</p>
+      {items.map((item) => (
+        <div key={item.productId} className="flex items-center justify-between gap-3 rounded-lg border p-3 text-sm">
+          <span>{item.productName ?? "Product"}</span>
+          <Badge variant="secondary" className="rounded-md">{formatNumber(item.availableStock)} available</Badge>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function ProductTable({
+  title,
+  products,
+  empty,
+}: {
+  title: string;
+  products: ProductPerformance[];
+  empty: string;
+}) {
+  return (
+    <ReportCard title={title} description="Product rankings based on sold quantity.">
+      {products.length ? (
+        <div className="overflow-x-auto">
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>Product</TableHead>
+                <TableHead>Quantity Sold</TableHead>
+                <TableHead className="text-right">Revenue</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {products.map((product) => (
+                <TableRow key={`${title}-${product.productId}`}>
+                  <TableCell className="font-medium">{product.productName}</TableCell>
+                  <TableCell>{formatNumber(product.quantitySold)}</TableCell>
+                  <TableCell className="text-right">{formatCurrency(product.revenue)}</TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        </div>
+      ) : (
+        <EmptyInline message={empty} />
+      )}
+    </ReportCard>
+  );
+}
+
+function EmptyInline({ message }: { message: string }) {
+  return (
+    <div className="rounded-lg border border-dashed p-6 text-center text-sm text-muted-foreground">
+      {message}
+    </div>
+  );
+}
+
+function ReportsSkeleton() {
+  return (
+    <div className="space-y-4">
+      <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
+        {Array.from({ length: 5 }).map((_, index) => (
+          <Skeleton key={index} className="h-28" />
         ))}
       </div>
-
-      {/* Inventory Summary */}
-      <div className="grid lg:grid-cols-2 gap-6">
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-base flex items-center gap-2">
-              <Package className="h-4 w-4" />
-              Inventory Overview
-            </CardTitle>
-            <CardDescription>Current stock status across all products</CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            {isLoading ? (
-              <div className="space-y-3">
-                {[1, 2, 3].map((i) => (
-                  <Skeleton key={i} className="h-8 w-full" />
-                ))}
-              </div>
-            ) : (
-              <>
-                <div className="flex items-center justify-between p-3 rounded-lg bg-emerald-50 dark:bg-emerald-950/20">
-                  <div className="flex items-center gap-3">
-                    <div className="h-8 w-8 rounded-lg bg-emerald-100 flex items-center justify-center">
-                      <Package className="h-4 w-4 text-emerald-600" />
-                    </div>
-                    <div>
-                      <p className="text-sm font-medium">In Stock</p>
-                      <p className="text-xs text-muted-foreground">Available for ordering</p>
-                    </div>
-                  </div>
-                  <span className="text-lg font-bold text-emerald-600">
-                    {inventoryTotal - lowStockCount - (inventoryStatsQuery.data?.outOfStock ?? 0)}
-                  </span>
-                </div>
-                <div className="flex items-center justify-between p-3 rounded-lg bg-amber-50 dark:bg-amber-950/20">
-                  <div className="flex items-center gap-3">
-                    <div className="h-8 w-8 rounded-lg bg-amber-100 flex items-center justify-center">
-                      <TrendingUp className="h-4 w-4 text-amber-600" />
-                    </div>
-                    <div>
-                      <p className="text-sm font-medium">Low Stock</p>
-                      <p className="text-xs text-muted-foreground">Below reorder level</p>
-                    </div>
-                  </div>
-                  <span className="text-lg font-bold text-amber-600">
-                    {lowStockCount}
-                  </span>
-                </div>
-                <div className="flex items-center justify-between p-3 rounded-lg bg-red-50 dark:bg-red-950/20">
-                  <div className="flex items-center gap-3">
-                    <div className="h-8 w-8 rounded-lg bg-red-100 flex items-center justify-center">
-                      <ArrowDownRight className="h-4 w-4 text-red-600" />
-                    </div>
-                    <div>
-                      <p className="text-sm font-medium">Out of Stock</p>
-                      <p className="text-xs text-muted-foreground">Unavailable for ordering</p>
-                    </div>
-                  </div>
-                  <span className="text-lg font-bold text-red-600">
-                    {inventoryStatsQuery.data?.outOfStock ?? 0}
-                  </span>
-                </div>
-              </>
-            )}
-          </CardContent>
-        </Card>
-
-        {/* Recent Order Values */}
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-base flex items-center gap-2">
-              <IndianRupee className="h-4 w-4" />
-              Recent Order Values
-            </CardTitle>
-            <CardDescription>Last 10 order amounts</CardDescription>
-          </CardHeader>
-          <CardContent>
-            {isLoading ? (
-              <div className="space-y-3">
-                {[1, 2, 3, 4, 5].map((i) => (
-                  <Skeleton key={i} className="h-8 w-full" />
-                ))}
-              </div>
-            ) : recentOrdersQuery.data && recentOrdersQuery.data.length > 0 ? (
-              <div className="space-y-3">
-                {recentOrdersQuery.data.map((order) => (
-                  <div
-                    key={order.id}
-                    className="flex items-center justify-between p-3 rounded-lg hover:bg-muted/50 transition-colors"
-                  >
-                    <div className="flex items-center gap-3">
-                      <div className="h-8 w-8 rounded-lg bg-muted flex items-center justify-center">
-                        <Package className="h-4 w-4 text-muted-foreground" />
-                      </div>
-                      <div>
-                        <p className="text-sm font-medium">{order.orderNumber}</p>
-                        <p className="text-xs text-muted-foreground">{order.supplierName}</p>
-                      </div>
-                    </div>
-                    <span className="font-semibold text-sm">
-                      {formatCurrency(order.totalAmount)}
-                    </span>
-                  </div>
-                ))}
-              </div>
-            ) : (
-              <div className="text-center py-8 text-muted-foreground">
-                <p className="text-sm">No recent orders</p>
-              </div>
-            )}
-          </CardContent>
-        </Card>
+      <div className="grid gap-4 xl:grid-cols-2">
+        {Array.from({ length: 4 }).map((_, index) => (
+          <Skeleton key={index} className="h-72" />
+        ))}
       </div>
     </div>
   );

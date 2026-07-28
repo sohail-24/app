@@ -7,7 +7,11 @@ import {
   cartItems,
   orders,
   orderItems,
+  invoices,
+  invoiceItems,
   inventory,
+  warehouses,
+  warehouseStockMovements,
 } from "./schema";
 
 // ─────────────────────────────────────────────────────────────
@@ -28,7 +32,10 @@ export const companiesRelations = relations(companies, ({ many }) => ({
   products: many(products),
   ordersAsBuyer: many(orders, { relationName: "buyer" }),
   ordersAsSupplier: many(orders, { relationName: "supplier" }),
+  invoices: many(invoices),
   inventoryItems: many(inventory),
+  warehouses: many(warehouses),
+  warehouseStockMovements: many(warehouseStockMovements),
 }));
 
 // Categories can have subcategories and products
@@ -55,6 +62,7 @@ export const productsRelations = relations(products, ({ one, many }) => ({
   cartItems: many(cartItems),
   orderItems: many(orderItems),
   inventoryItems: many(inventory),
+  warehouseStockMovements: many(warehouseStockMovements),
 }));
 
 // Cart items belong to a User and Product
@@ -86,6 +94,10 @@ export const ordersRelations = relations(orders, ({ one, many }) => ({
     references: [users.id],
   }),
   items: many(orderItems),
+  invoice: one(invoices, {
+    fields: [orders.id],
+    references: [invoices.orderId],
+  }),
 }));
 
 // Order items belong to an Order and Product
@@ -100,6 +112,26 @@ export const orderItemsRelations = relations(orderItems, ({ one }) => ({
   }),
 }));
 
+// Invoices belong to Company and Order, and contain immutable line items
+export const invoicesRelations = relations(invoices, ({ one, many }) => ({
+  company: one(companies, {
+    fields: [invoices.companyId],
+    references: [companies.id],
+  }),
+  order: one(orders, {
+    fields: [invoices.orderId],
+    references: [orders.id],
+  }),
+  items: many(invoiceItems),
+}));
+
+export const invoiceItemsRelations = relations(invoiceItems, ({ one }) => ({
+  invoice: one(invoices, {
+    fields: [invoiceItems.invoiceId],
+    references: [invoices.id],
+  }),
+}));
+
 // Inventory belongs to a Product and Supplier
 export const inventoryRelations = relations(inventory, ({ one }) => ({
   product: one(products, {
@@ -111,3 +143,39 @@ export const inventoryRelations = relations(inventory, ({ one }) => ({
     references: [companies.id],
   }),
 }));
+
+// Warehouses belong to a Company and have movement history
+export const warehousesRelations = relations(warehouses, ({ one, many }) => ({
+  company: one(companies, {
+    fields: [warehouses.companyId],
+    references: [companies.id],
+  }),
+  movements: many(warehouseStockMovements),
+}));
+
+// Warehouse stock movements belong to Warehouse, Company, Product, Inventory, and User
+export const warehouseStockMovementsRelations = relations(
+  warehouseStockMovements,
+  ({ one }) => ({
+    warehouse: one(warehouses, {
+      fields: [warehouseStockMovements.warehouseId],
+      references: [warehouses.id],
+    }),
+    company: one(companies, {
+      fields: [warehouseStockMovements.companyId],
+      references: [companies.id],
+    }),
+    product: one(products, {
+      fields: [warehouseStockMovements.productId],
+      references: [products.id],
+    }),
+    inventory: one(inventory, {
+      fields: [warehouseStockMovements.inventoryId],
+      references: [inventory.id],
+    }),
+    performedBy: one(users, {
+      fields: [warehouseStockMovements.performedByUserId],
+      references: [users.id],
+    }),
+  }),
+);

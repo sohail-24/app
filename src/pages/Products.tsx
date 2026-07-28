@@ -6,7 +6,6 @@ import { useAuth } from "@/hooks/useAuth";
 import { addGuestCartItem } from "@/lib/guestCart";
 import { formatCurrency, toNumber, unitLabels } from "@/lib/i18n";
 import { getAppRole } from "@/lib/roles";
-import { categories, productSamples } from "@/lib/freshflowData";
 import { MetricCard } from "@/components/freshflow/MetricCard";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -22,11 +21,29 @@ import {
   Image as ImageIcon,
   Minus,
   Plus,
+  Package,
   Search,
   ShoppingCart,
   SlidersHorizontal,
   Star,
 } from "lucide-react";
+
+type CatalogProduct = {
+  id: number;
+  name: string;
+  slug: string;
+  image?: string | null;
+  categoryId?: number | null;
+  categoryName?: string | null;
+  supplierName?: string | null;
+  unitPrice?: unknown;
+  unitType?: string | null;
+  unitSize?: string | null;
+  minimumOrderQuantity?: number | null;
+  status?: string | null;
+  stock?: number | null;
+  rating?: string | number | null;
+};
 
 export default function Products() {
   const { user } = useAuth();
@@ -64,12 +81,12 @@ function BuyerMarketplace() {
     onError: (error) => toast.error(error.message || "Could not add product to cart."),
   });
 
-  const products = productsQuery.data?.length ? productsQuery.data : productSamples;
+  const products = (productsQuery.data ?? []) as CatalogProduct[];
   const activeCategories = categoriesQuery.data ?? [];
 
-  function addProductToCart(product: any) {
-    const quantity = product.minimumOrderQuantity ?? product.moq ?? 1;
-    if (user && "id" in product && !("icon" in product)) {
+  function addProductToCart(product: CatalogProduct) {
+    const quantity = product.minimumOrderQuantity ?? 1;
+    if (user) {
       addToCart.mutate({ productId: product.id, quantity });
       return;
     }
@@ -80,10 +97,10 @@ function BuyerMarketplace() {
       productSlug: product.slug,
       productName: product.name,
       productImage: product.image ?? null,
-      productUnitType: product.unitType ?? product.unit,
-      productUnitSize: product.unitSize ?? product.unit,
+      productUnitType: product.unitType ?? "kg",
+      productUnitSize: product.unitSize ?? product.unitType ?? "kg",
       quantity,
-      unitPrice: String(product.unitPrice ?? product.price),
+      unitPrice: String(product.unitPrice ?? 0),
     });
     toast.success("Product added to cart.");
   }
@@ -106,9 +123,23 @@ function BuyerMarketplace() {
           </div>
         </div>
         <div className="flex gap-2 overflow-x-auto p-3">
-          {categories.map((category) => (
-            <Button key={category} variant="ghost" className="shrink-0">
-              {category}
+          <Button
+            type="button"
+            variant={categoryId === "all" ? "default" : "ghost"}
+            className="shrink-0"
+            onClick={() => setCategoryId("all")}
+          >
+            All Products
+          </Button>
+          {activeCategories.map((category) => (
+            <Button
+              key={category.id}
+              type="button"
+              variant={categoryId === String(category.id) ? "default" : "ghost"}
+              className="shrink-0"
+              onClick={() => setCategoryId(String(category.id))}
+            >
+              {category.name}
             </Button>
           ))}
         </div>
@@ -174,7 +205,7 @@ function BuyerMarketplace() {
                 <Button variant="outline"><SlidersHorizontal className="mr-2 h-4 w-4" />Price</Button>
                 <Button variant="outline"><Star className="mr-2 h-4 w-4" />Rating</Button>
               </div>
-              <p className="text-sm font-medium">{products.length || 248} Products</p>
+              <p className="text-sm font-medium">{products.length} Products</p>
             </CardContent>
           </Card>
 
@@ -184,44 +215,50 @@ function BuyerMarketplace() {
             </div>
           ) : (
             <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-              {products.map((product: any) => (
+              {products.map((product) => (
                 <ProductCard key={product.id} product={product} onAdd={() => addProductToCart(product)} pending={addToCart.isPending} />
               ))}
             </div>
           )}
 
-          <div className="flex justify-center gap-2 py-4">
-            <Button variant="outline">Previous</Button>
-            {[1, 2, 3, 4, 5].map((page) => <Button key={page} variant={page === 1 ? "default" : "outline"} size="icon">{page}</Button>)}
-            <Button variant="outline">Next</Button>
-          </div>
+          {!productsQuery.isLoading && !products.length && (
+            <Card>
+              <CardContent className="flex min-h-60 flex-col items-center justify-center p-8 text-center">
+                <Package className="mb-3 h-10 w-10 text-muted-foreground/50" />
+                <h2 className="font-semibold">No active products found</h2>
+                <p className="mt-1 max-w-md text-sm text-muted-foreground">
+                  Products created and published by the business owner will appear here.
+                </p>
+              </CardContent>
+            </Card>
+          )}
         </main>
       </div>
     </div>
   );
 }
 
-function ProductCard({ product, onAdd, pending }: { product: any; onAdd: () => void; pending?: boolean }) {
-  const price = toNumber(product.unitPrice ?? product.price);
-  const moq = product.minimumOrderQuantity ?? product.moq ?? 1;
-  const unit = product.unitType ?? product.unit ?? "kg";
+function ProductCard({ product, onAdd, pending }: { product: CatalogProduct; onAdd: () => void; pending?: boolean }) {
+  const price = toNumber(product.unitPrice);
+  const moq = product.minimumOrderQuantity ?? 1;
+  const unit = product.unitType ?? "kg";
   const [quantity, setQuantity] = useState(moq);
 
   return (
     <Card className="overflow-hidden shadow-sm">
       <div className="flex aspect-[4/3] items-center justify-center bg-muted text-lg font-semibold text-muted-foreground">
-        {product.image ? <img src={product.image} alt={product.name} className="h-full w-full object-cover" /> : product.icon ?? <ImageIcon className="h-9 w-9" />}
+        {product.image ? <img src={product.image} alt={product.name} className="h-full w-full object-cover" /> : <ImageIcon className="h-9 w-9" />}
       </div>
       <CardContent className="space-y-3 p-4 text-sm">
         <div>
           <Link to={`/products/${product.slug}`} className="text-base font-semibold hover:text-primary">{product.name}</Link>
-          <p className="text-xs text-muted-foreground">{product.supplierName ?? product.supplier ?? "Supplier"}</p>
+          <p className="text-xs text-muted-foreground">{product.supplierName ?? "Supplier"}</p>
         </div>
         <div className="grid gap-1 text-muted-foreground">
           <p><span className="font-medium text-foreground">{formatCurrency(price)}</span> / {unitLabels[unit] ?? unit}</p>
-          <p>Stock {product.stock ?? "Backend"}</p>
+          <p>Stock {product.stock ?? "Not set"}</p>
           <p>MOQ {moq} {unit}</p>
-          <p>Rating {product.rating ?? "4.8"}</p>
+          {product.rating && <p>Rating {product.rating}</p>}
         </div>
         <div className="flex items-center justify-between rounded-md border p-2">
           <Button variant="outline" size="icon" className="h-7 w-7" onClick={() => setQuantity(Math.max(moq, quantity - 1))}>

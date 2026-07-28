@@ -3,7 +3,6 @@ import { trpc } from "@/providers/trpc";
 import { useAuth } from "@/hooks/useAuth";
 import { formatCurrency, formatDate, formatNumber } from "@/lib/i18n";
 import { getAppRole } from "@/lib/roles";
-import { categories, productSamples } from "@/lib/freshflowData";
 import { MetricCard } from "@/components/freshflow/MetricCard";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -12,20 +11,19 @@ import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
   AlertTriangle,
-  Bell,
   ChartNoAxesCombined,
   CheckCircle2,
   ClipboardList,
+  FileText,
   FolderTree,
   IndianRupee,
   Package,
   Plus,
   Search,
-  Settings,
   ShoppingBag,
   ShoppingCart,
   Truck,
-  Users,
+  Warehouse,
 } from "lucide-react";
 
 const ownerNav = [
@@ -33,7 +31,9 @@ const ownerNav = [
   "Product Catalog",
   "Categories",
   "Inventory",
+  "Warehouse",
   "Orders",
+  "Invoices",
   "Customers",
   "Delivery Zones",
   "GST Rules",
@@ -45,17 +45,6 @@ const ownerNav = [
   "Settings",
 ];
 
-const ownerStats = [
-  ["Products", "120", Package],
-  ["Orders", "42", ClipboardList],
-  ["Customers", "18", Users],
-  ["Revenue", "₹4,52,600", IndianRupee],
-  ["Low Stock", "12", AlertTriangle],
-  ["Pending PO", "8", ShoppingCart],
-  ["Suppliers", "25", Truck],
-  ["Coupons", "3", Settings],
-] as const;
-
 export default function Dashboard() {
   const { user } = useAuth();
   const role = getAppRole(user);
@@ -66,15 +55,21 @@ export default function Dashboard() {
   );
   const categoriesQuery = trpc.category.list.useQuery(undefined, { retry: false });
   const recentOrdersQuery = trpc.order.recent.useQuery({ limit: 5 }, { retry: false, enabled: !!user });
+  const cartQuery = trpc.cart.list.useQuery(undefined, {
+    retry: false,
+    enabled: role === "buyer" && !!user,
+  });
 
   if (role === "buyer") {
     return (
       <BuyerDashboard
         products={productsQuery.data ?? []}
         productsLoading={productsQuery.isLoading}
-        categoryCount={categoriesQuery.data?.length ?? categories.length}
+        categoryCount={categoriesQuery.data?.length ?? 0}
         recentOrders={recentOrdersQuery.data ?? []}
         ordersLoading={recentOrdersQuery.isLoading}
+        cartCount={cartQuery.data?.count ?? 0}
+        cartLoading={cartQuery.isLoading}
       />
     );
   }
@@ -88,6 +83,8 @@ function BuyerDashboard({
   categoryCount,
   recentOrders,
   ordersLoading,
+  cartCount,
+  cartLoading,
 }: {
   products: Array<{
     id: number;
@@ -98,13 +95,16 @@ function BuyerDashboard({
     unitPrice: unknown;
     unitType: string;
     minimumOrderQuantity: number;
+    image?: string | null;
   }>;
   productsLoading: boolean;
   categoryCount: number;
-  recentOrders: Array<{ id: number; orderNumber: string; totalAmount: unknown; status: string; orderedAt: Date; supplierName: string | null }>;
+  recentOrders: Array<{ id: number; orderNumber: string; totalAmount: unknown; status: string; orderedAt: Date; relatedCompanyName: string | null }>;
   ordersLoading: boolean;
+  cartCount: number;
+  cartLoading: boolean;
 }) {
-  const featured = products.length ? products.slice(0, 4) : productSamples;
+  const featured = products.slice(0, 4);
 
   return (
     <div className="mx-auto flex w-full max-w-[1500px] flex-col gap-6">
@@ -131,7 +131,7 @@ function BuyerDashboard({
       </section>
 
       <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-        <MetricCard icon={ShoppingCart} title="Cart Items" value="Backend" caption="Cart count placeholder" />
+        <MetricCard icon={ShoppingCart} title="Cart Items" value={formatNumber(cartCount)} caption="Current cart" loading={cartLoading} />
         <MetricCard icon={Truck} title="Pending Deliveries" value={formatNumber(recentOrders.filter((order) => order.status !== "delivered").length)} caption="From order history" loading={ordersLoading} />
         <MetricCard icon={FolderTree} title="Categories" value={formatNumber(categoryCount)} caption="Active catalog groups" />
         <MetricCard icon={ClipboardList} title="Recent Orders" value={formatNumber(recentOrders.length)} caption="Order history" loading={ordersLoading} />
@@ -149,19 +149,27 @@ function BuyerDashboard({
               </div>
             ) : (
               <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-                {featured.map((product) => (
+                {featured.length ? featured.map((product) => (
                   <Link key={product.id} to={`/products/${product.slug}`} className="rounded-lg border bg-card p-3 shadow-sm hover:bg-muted/40">
-                    <div className="flex aspect-[4/3] items-center justify-center rounded-md bg-muted text-lg font-semibold text-muted-foreground">
-                      {"icon" in product ? product.icon : product.name}
+                    <div className="flex aspect-[4/3] items-center justify-center overflow-hidden rounded-md bg-muted text-lg font-semibold text-muted-foreground">
+                      {product.image ? (
+                        <img src={product.image} alt={product.name} className="h-full w-full object-cover" />
+                      ) : (
+                        <Package className="h-8 w-8" />
+                      )}
                     </div>
                     <div className="mt-3">
                       <p className="font-medium">{product.name}</p>
                       <p className="text-xs text-muted-foreground">
-                        {"supplier" in product ? product.supplier : product.supplierName ?? "Supplier"} · MOQ {"moq" in product ? product.moq : product.minimumOrderQuantity}
+                        {product.supplierName ?? "Supplier"} · MOQ {product.minimumOrderQuantity}
                       </p>
                     </div>
                   </Link>
-                ))}
+                )) : (
+                  <p className="rounded-lg border p-4 text-sm text-muted-foreground sm:col-span-2 xl:col-span-4">
+                    Published products will appear here.
+                  </p>
+                )}
               </div>
             )}
           </CardContent>
@@ -180,7 +188,7 @@ function BuyerDashboard({
                   <Link key={order.id} to={`/orders/${order.id}`} className="flex items-center justify-between gap-3 p-3 hover:bg-muted/60">
                     <div className="min-w-0">
                       <p className="truncate text-sm font-medium">{order.orderNumber}</p>
-                      <p className="text-xs text-muted-foreground">{order.supplierName ?? "Supplier"} · {formatDate(order.orderedAt)}</p>
+                      <p className="text-xs text-muted-foreground">{order.relatedCompanyName ?? "Supplier"} · {formatDate(order.orderedAt)}</p>
                     </div>
                     <span className="text-sm font-semibold">{formatCurrency(order.totalAmount)}</span>
                   </Link>
@@ -197,6 +205,36 @@ function BuyerDashboard({
 }
 
 function OwnerDashboard() {
+  const reportSummaryQuery = trpc.report.dashboardSummary.useQuery(
+    { period: "today" },
+    { retry: false, refetchInterval: 10000 },
+  );
+  const recentOrdersQuery = trpc.order.recent.useQuery(
+    { limit: 5, type: "supplier" },
+    { retry: false, refetchInterval: 10000 },
+  );
+  const lowStockQuery = trpc.inventory.list.useQuery(
+    { status: "low_stock" },
+    { retry: false, refetchInterval: 10000 },
+  );
+  const summary = reportSummaryQuery.data;
+  const recentOrderItems = (recentOrdersQuery.data ?? []).map((order) => ({
+    label: `${order.orderNumber}   ${order.relatedCompanyName ?? "Customer"}   ${formatCurrency(order.totalAmount)}`,
+    to: `/orders/${order.id}`,
+  }));
+  const lowStockItems = (lowStockQuery.data ?? []).slice(0, 5).map((item) => ({
+    label: `${item.productName ?? `Product #${item.productId}`}   ${formatNumber(item.quantityAvailable)} available`,
+    to: `/inventory`,
+  }));
+  const ownerStats = [
+    ["Revenue", formatCurrency(summary?.revenue ?? 0), IndianRupee],
+    ["Orders", formatNumber(summary?.orders ?? 0), ClipboardList],
+    ["Products", formatNumber(summary?.products ?? 0), Package],
+    ["Inventory", formatNumber(summary?.inventory ?? 0), Warehouse],
+    ["Invoices", formatNumber(summary?.invoices ?? 0), FileText],
+    ["Low Stock", formatNumber(summary?.lowStock ?? 0), AlertTriangle],
+  ] as const;
+
   return (
     <div className="mx-auto grid w-full max-w-[1500px] gap-5 lg:grid-cols-[240px_minmax(0,1fr)]">
       <aside className="rounded-lg border bg-card p-3 shadow-sm">
@@ -228,7 +266,7 @@ function OwnerDashboard() {
 
         <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
           {ownerStats.map(([title, value, Icon]) => (
-            <MetricCard key={title} title={title} value={value} icon={Icon} />
+            <MetricCard key={title} title={title} value={value} icon={Icon} loading={reportSummaryQuery.isLoading} />
           ))}
         </section>
 
@@ -247,10 +285,8 @@ function OwnerDashboard() {
         </Card>
 
         <section className="grid gap-4 xl:grid-cols-2">
-          <DashboardList title="Recent Orders" items={["#ORD-1001   Pending", "#ORD-1002   Packed", "#ORD-1003   Delivered"]} />
-          <DashboardList title="Low Stock Alerts" items={["Mango        Only 8 kg", "Apple        Only 12 kg", "Tomato       Only 15 kg"]} />
-          <DashboardList title="Recent Customers" items={["Fresh Mart", "Green Wholesale", "Hyderabad Super Market"]} />
-          <DashboardList title="Recent Notifications" items={["New Order Received", "Low Stock Alert", "Payment Received"]} icon={Bell} />
+          <DashboardList title="Recent Orders" items={recentOrderItems} loading={recentOrdersQuery.isLoading} empty="New orders will appear here." />
+          <DashboardList title="Low Stock Alerts" items={lowStockItems} loading={lowStockQuery.isLoading} empty="No low-stock products." />
         </section>
 
         <Card>
@@ -258,11 +294,18 @@ function OwnerDashboard() {
             <CardTitle className="text-base">Quick Actions</CardTitle>
           </CardHeader>
           <CardContent className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-            {["Add Product", "Add Category", "Create Coupon", "Add Supplier", "Inventory", "Delivery Zone", "GST Settings", "Shipping Rule"].map((action) => (
-              <Button key={action} variant="outline" className="justify-start">
-                <Plus className="mr-2 h-4 w-4" />
-                {action}
-              </Button>
+            {[
+              { label: "Add Product", to: "/products/new" },
+              { label: "Product Catalog", to: "/products" },
+              { label: "Inventory", to: "/inventory" },
+              { label: "Orders", to: "/orders" },
+            ].map((action) => (
+              <Link key={action.label} to={action.to}>
+                <Button variant="outline" className="w-full justify-start">
+                  <Plus className="mr-2 h-4 w-4" />
+                  {action.label}
+                </Button>
+              </Link>
             ))}
           </CardContent>
         </Card>
@@ -288,7 +331,19 @@ function OwnerDashboard() {
   );
 }
 
-function DashboardList({ title, items, icon: Icon }: { title: string; items: string[]; icon?: typeof Bell }) {
+function DashboardList({
+  title,
+  items,
+  icon: Icon,
+  loading,
+  empty = "No records found.",
+}: {
+  title: string;
+  items: Array<string | { label: string; to?: string }>;
+  icon?: typeof ClipboardList;
+  loading?: boolean;
+  empty?: string;
+}) {
   return (
     <Card>
       <CardHeader className="pb-2">
@@ -298,11 +353,25 @@ function DashboardList({ title, items, icon: Icon }: { title: string; items: str
         </CardTitle>
       </CardHeader>
       <CardContent>
-        <div className="divide-y rounded-lg border">
-          {items.map((item) => (
-            <div key={item} className="px-3 py-2 text-sm">{item}</div>
-          ))}
-        </div>
+        {loading ? (
+          <Skeleton className="h-32" />
+        ) : items.length ? (
+          <div className="divide-y rounded-lg border">
+            {items.map((item) => {
+              const label = typeof item === "string" ? item : item.label;
+              const content = <span className="block truncate px-3 py-2 text-sm">{label}</span>;
+              return typeof item !== "string" && item.to ? (
+                <Link key={`${item.to}-${label}`} to={item.to} className="block hover:bg-muted/60">
+                  {content}
+                </Link>
+              ) : (
+                <div key={label}>{content}</div>
+              );
+            })}
+          </div>
+        ) : (
+          <p className="rounded-lg border p-4 text-sm text-muted-foreground">{empty}</p>
+        )}
       </CardContent>
     </Card>
   );
@@ -314,7 +383,9 @@ function ownerPath(label: string) {
     "Product Catalog": "/products",
     Categories: "/categories",
     Inventory: "/inventory",
+    Warehouse: "/warehouse",
     Orders: "/orders",
+    Invoices: "/invoices",
     Reports: "/reports",
     Settings: "/settings",
   };

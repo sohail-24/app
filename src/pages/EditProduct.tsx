@@ -30,6 +30,7 @@ import {
   Tag,
   Trash2,
   UploadCloud,
+  Warehouse,
 } from "lucide-react";
 
 type ProductForm = {
@@ -39,13 +40,24 @@ type ProductForm = {
   categoryId: string;
   description: string;
   purchasePrice: string;
+  wholesalePrice: string;
   sellingPrice: string;
+  discount: string;
+  supplierId: string;
+  availableStock: string;
+  reservedStock: string;
+  onHandStock: string;
+  reorderLevel: string;
+  reorderQuantity: string;
+  warehouse: string;
+  batchNumber: string;
   status: "draft" | "active" | "archived";
   unitType: "kg" | "lb" | "case" | "pallet" | "each" | "bunch" | "box" | "bag";
   unitSize: string;
   minimumOrderQuantity: string;
   grade: "premium" | "grade_a" | "grade_b" | "standard";
   organic: boolean;
+  tags: string;
 };
 
 type ImageRow = {
@@ -70,13 +82,24 @@ function emptyForm(): ProductForm {
     categoryId: "",
     description: "",
     purchasePrice: "",
+    wholesalePrice: "",
     sellingPrice: "",
+    discount: "0",
+    supplierId: "",
+    availableStock: "",
+    reservedStock: "0",
+    onHandStock: "0",
+    reorderLevel: "10",
+    reorderQuantity: "100",
+    warehouse: "",
+    batchNumber: "",
     status: "draft",
     unitType: "kg",
     unitSize: "",
     minimumOrderQuantity: "1",
     grade: "grade_a",
     organic: false,
+    tags: "",
   };
 }
 
@@ -107,6 +130,12 @@ export default function EditProduct() {
 
   const productQuery = trpc.product.bySlug.useQuery({ slug: slug! }, { enabled: !!slug, retry: false });
   const categoriesQuery = trpc.category.list.useQuery(undefined, { retry: false });
+  const companiesQuery = trpc.company.list.useQuery(undefined, { retry: false });
+  const productId = productQuery.data?.id;
+  const inventoryQuery = trpc.inventory.byProduct.useQuery(
+    { productId: productId ?? 0 },
+    { enabled: !!productId, retry: false },
+  );
   const updateProduct = trpc.product.update.useMutation({
     onSuccess: async () => {
       await Promise.all([
@@ -126,6 +155,8 @@ export default function EditProduct() {
 
   const product = productQuery.data;
   const categories = categoriesQuery.data ?? [];
+  const suppliers = (companiesQuery.data ?? []).filter((company) => company.type === "supplier" || company.type === "both");
+  const inventoryRecord = inventoryQuery.data?.[0];
 
   useEffect(() => {
     if (!product) return;
@@ -137,16 +168,27 @@ export default function EditProduct() {
       categoryId: String(product.categoryId ?? ""),
       description: product.description ?? "",
       purchasePrice: String(toNumber(product.compareAtPrice, getPurchasePrice(product.unitPrice))),
+      wholesalePrice: meta.wholesalePrice !== undefined ? String(meta.wholesalePrice) : "",
       sellingPrice: String(toNumber(product.unitPrice)),
+      discount: meta.discount !== undefined ? String(meta.discount) : "0",
+      supplierId: String(product.supplierId ?? ""),
+      availableStock: inventoryRecord ? String(inventoryRecord.quantityAvailable) : "",
+      reservedStock: inventoryRecord ? String(inventoryRecord.quantityReserved) : "0",
+      onHandStock: inventoryRecord ? String(inventoryRecord.quantityOnHand) : "0",
+      reorderLevel: inventoryRecord ? String(inventoryRecord.reorderLevel) : "10",
+      reorderQuantity: inventoryRecord ? String(inventoryRecord.reorderQuantity) : "100",
+      warehouse: inventoryRecord?.warehouseLocation ?? "",
+      batchNumber: inventoryRecord?.batchNumber ?? "",
       status: product.status as ProductForm["status"],
       unitType: product.unitType as ProductForm["unitType"],
       unitSize: product.unitSize ?? "",
       minimumOrderQuantity: String(product.minimumOrderQuantity ?? 1),
       grade: product.grade as ProductForm["grade"],
       organic: Boolean(product.organic),
+      tags: meta.tags?.join(", ") ?? "",
     });
     setImages(parseImages(product.images, product.image));
-  }, [product]);
+  }, [product, inventoryRecord]);
 
   const margin = useMemo(() => {
     const selling = toNumber(form.sellingPrice);
@@ -161,6 +203,8 @@ export default function EditProduct() {
     categoryId: form.categoryId ? "" : "Category is required.",
     purchasePrice: toNumber(form.purchasePrice) > 0 ? "" : "Purchase price must be greater than zero.",
     sellingPrice: toNumber(form.sellingPrice) > 0 ? "" : "Selling price must be greater than zero.",
+    supplierId: form.supplierId ? "" : "Supplier is required.",
+    onHandStock: toNumber(form.onHandStock) >= 0 ? "" : "Stock cannot be negative.",
     minimumOrderQuantity: toNumber(form.minimumOrderQuantity) > 0 ? "" : "Minimum order quantity must be greater than zero.",
   };
   const isFormValid = Object.values(errors).every((error) => !error);
@@ -209,9 +253,21 @@ export default function EditProduct() {
       sku: form.sku,
       barcode: form.barcode || undefined,
       categoryId: Number(form.categoryId),
+      supplierId: Number(form.supplierId),
       description: form.description || undefined,
       purchasePrice: toNumber(form.purchasePrice),
+      wholesalePrice: form.wholesalePrice ? toNumber(form.wholesalePrice) : undefined,
       sellingPrice: toNumber(form.sellingPrice),
+      discount: toNumber(form.discount),
+      openingStock: Math.max(0, Math.floor(toNumber(form.onHandStock))),
+      availableStock: form.availableStock.trim()
+        ? Math.max(0, Math.floor(toNumber(form.availableStock)))
+        : undefined,
+      reservedStock: Math.max(0, Math.floor(toNumber(form.reservedStock))),
+      minimumStock: Math.max(0, Math.floor(toNumber(form.reorderLevel))),
+      reorderQuantity: Math.max(0, Math.floor(toNumber(form.reorderQuantity))),
+      warehouse: form.warehouse,
+      batchNumber: form.batchNumber || undefined,
       status: form.status,
       unitType: form.unitType,
       unitSize: form.unitSize || undefined,
@@ -219,6 +275,7 @@ export default function EditProduct() {
       grade: form.grade,
       organic: form.organic,
       images: images.map((image) => image.url),
+      tags: form.tags.split(",").map((tag) => tag.trim()).filter(Boolean),
     });
   };
 
@@ -297,6 +354,20 @@ export default function EditProduct() {
                   </SelectContent>
                 </Select>
               </Field>
+              <Field label="Supplier" required error={attemptedSubmit ? errors.supplierId : ""}>
+                <Select value={form.supplierId} onValueChange={(value) => updateField("supplierId", value)}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select supplier" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {suppliers.map((supplier) => (
+                      <SelectItem key={supplier.id} value={String(supplier.id)}>
+                        {supplier.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </Field>
               <Field label="SKU" required error={attemptedSubmit ? errors.sku : ""}>
                 <Input value={form.sku} onChange={(event) => updateField("sku", event.target.value)} />
               </Field>
@@ -325,6 +396,11 @@ export default function EditProduct() {
               <div className="md:col-span-2">
                 <Field label="Description">
                   <Textarea value={form.description} onChange={(event) => updateField("description", event.target.value)} className="min-h-28" />
+                </Field>
+              </div>
+              <div className="md:col-span-2">
+                <Field label="Tags">
+                  <Input value={form.tags} onChange={(event) => updateField("tags", event.target.value)} placeholder="seasonal, bulk, premium" />
                 </Field>
               </div>
             </CardContent>
@@ -427,18 +503,56 @@ export default function EditProduct() {
                 Pricing
               </CardTitle>
             </CardHeader>
-            <CardContent className="grid gap-4 md:grid-cols-3">
+            <CardContent className="grid gap-4 md:grid-cols-4">
               <Field label="Purchase Price" required error={attemptedSubmit ? errors.purchasePrice : ""}>
                 <Input type="number" value={form.purchasePrice} onChange={(event) => updateField("purchasePrice", event.target.value)} />
               </Field>
+              <Field label="Wholesale Price">
+                <Input type="number" value={form.wholesalePrice} onChange={(event) => updateField("wholesalePrice", event.target.value)} />
+              </Field>
               <Field label="Selling Price" required error={attemptedSubmit ? errors.sellingPrice : ""}>
                 <Input type="number" value={form.sellingPrice} onChange={(event) => updateField("sellingPrice", event.target.value)} />
+              </Field>
+              <Field label="Discount %">
+                <Input type="number" min="0" max="100" value={form.discount} onChange={(event) => updateField("discount", event.target.value)} />
               </Field>
               <div className="rounded-lg border bg-muted/40 p-3">
                 <p className="text-sm text-muted-foreground">Gross Margin</p>
                 <p className="mt-2 text-2xl font-semibold">{Number.isFinite(margin) ? margin.toFixed(1) : "0.0"}%</p>
                 <p className="mt-1 text-xs text-muted-foreground">{formatCurrency(toNumber(form.sellingPrice) - toNumber(form.purchasePrice))} per unit</p>
               </div>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2 text-base">
+                <Warehouse className="h-4 w-4" />
+                Inventory
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="grid gap-4 md:grid-cols-3">
+              <Field label="On Hand Stock" required error={attemptedSubmit ? errors.onHandStock : ""}>
+                <Input type="number" min="0" value={form.onHandStock} onChange={(event) => updateField("onHandStock", event.target.value)} />
+              </Field>
+              <Field label="Available Stock">
+                <Input type="number" min="0" value={form.availableStock} onChange={(event) => updateField("availableStock", event.target.value)} />
+              </Field>
+              <Field label="Reserved Stock">
+                <Input type="number" min="0" value={form.reservedStock} onChange={(event) => updateField("reservedStock", event.target.value)} />
+              </Field>
+              <Field label="Reorder Level">
+                <Input type="number" min="0" value={form.reorderLevel} onChange={(event) => updateField("reorderLevel", event.target.value)} />
+              </Field>
+              <Field label="Reorder Quantity">
+                <Input type="number" min="0" value={form.reorderQuantity} onChange={(event) => updateField("reorderQuantity", event.target.value)} />
+              </Field>
+              <Field label="Warehouse">
+                <Input value={form.warehouse} onChange={(event) => updateField("warehouse", event.target.value)} />
+              </Field>
+              <Field label="Batch Number">
+                <Input value={form.batchNumber} onChange={(event) => updateField("batchNumber", event.target.value)} />
+              </Field>
             </CardContent>
           </Card>
         </div>
@@ -452,6 +566,8 @@ export default function EditProduct() {
               <Snapshot label="Supplier" value={product.supplierName ?? "Unassigned supplier"} />
               <Snapshot label="Category" value={categories.find((category) => String(category.id) === form.categoryId)?.name ?? product.categoryName ?? "Uncategorized"} />
               <Snapshot label="Price" value={`${formatCurrency(form.sellingPrice)} / ${unitLabels[form.unitType] ?? form.unitType}`} />
+              <Snapshot label="Available Stock" value={form.availableStock || "0"} />
+              <Snapshot label="Warehouse" value={form.warehouse || "Unassigned"} />
               <Separator />
               <div className="rounded-lg bg-muted/50 p-3">
                 <p className="text-sm font-medium">Status</p>
@@ -459,6 +575,17 @@ export default function EditProduct() {
                   {form.status}
                 </Badge>
               </div>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-base">Inventory Snapshot</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-3">
+              <Snapshot label="On hand" value={form.onHandStock || "0"} />
+              <Snapshot label="Reserved" value={form.reservedStock || "0"} />
+              <Snapshot label="Reorder" value={form.reorderLevel || "0"} />
             </CardContent>
           </Card>
         </aside>

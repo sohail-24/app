@@ -1,10 +1,9 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router";
 import { toast } from "sonner";
 import { trpc } from "@/providers/trpc";
 import { useAuth } from "@/hooks/useAuth";
 import { addGuestCartItem } from "@/lib/guestCart";
-import { productSamples } from "@/lib/freshflowData";
 import { formatCurrency, toNumber, unitLabels } from "@/lib/i18n";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -17,7 +16,9 @@ export default function ProductDetail() {
   const navigate = useNavigate();
   const { user } = useAuth();
   const [imageFailed, setImageFailed] = useState(false);
-  const { data, isLoading } = trpc.product.bySlug.useQuery({ slug: slug! }, { enabled: !!slug, retry: false });
+  const [quantity, setQuantity] = useState(1);
+  const { data, isLoading, isError, error } = trpc.product.bySlug.useQuery({ slug: slug! }, { enabled: !!slug, retry: false });
+  const relatedQuery = trpc.product.featured.useQuery({ limit: 5 }, { retry: false });
   const utils = trpc.useUtils();
   const addToCart = trpc.cart.add.useMutation({
     onSuccess: async () => {
@@ -26,15 +27,20 @@ export default function ProductDetail() {
     },
     onError: (error) => toast.error(error.message || "Could not add product to cart."),
   });
-  const fallback = productSamples.find((item) => item.slug === slug) ?? productSamples[0];
-  const product: any = data ?? fallback;
-  const minQty = product.minimumOrderQuantity ?? product.moq ?? 1;
-  const [quantity, setQuantity] = useState(minQty);
-  const price = toNumber(product.unitPrice ?? product.price);
-  const compareAt = toNumber(product.compareAtPrice ?? product.compareAt);
-  const unit = product.unitType ?? product.unit ?? "kg";
-  const discount = compareAt > price ? Math.round(((compareAt - price) / compareAt) * 100) : 15;
-  const related = useMemo(() => productSamples.filter((item) => item.slug !== product.slug), [product.slug]);
+  const product = data;
+  const minQty = product?.minimumOrderQuantity ?? 1;
+  const price = toNumber(product?.unitPrice);
+  const compareAt = toNumber(product?.compareAtPrice);
+  const unit = product?.unitType ?? "kg";
+  const discount = compareAt > price ? Math.round(((compareAt - price) / compareAt) * 100) : 0;
+  const related = useMemo(
+    () => (relatedQuery.data ?? []).filter((item) => item.slug !== product?.slug).slice(0, 4),
+    [product?.slug, relatedQuery.data],
+  );
+
+  useEffect(() => {
+    setQuantity(minQty);
+  }, [minQty]);
 
   if (isLoading) {
     return (
@@ -45,6 +51,22 @@ export default function ProductDetail() {
     );
   }
 
+  if (!product || isError) {
+    return (
+      <div className="mx-auto flex min-h-[420px] max-w-xl flex-col items-center justify-center text-center">
+        <Package className="mb-4 h-12 w-12 text-muted-foreground/40" />
+        <h1 className="text-xl font-semibold">Product not found</h1>
+        <p className="mt-2 text-sm text-muted-foreground">
+          {error?.message ?? "This product may have been archived or is not available."}
+        </p>
+        <Link to="/products">
+          <Button className="mt-5" variant="outline">Back to Products</Button>
+        </Link>
+      </div>
+    );
+  }
+  const currentProduct = product;
+
   function addProduct(destination?: string) {
     if (user && data) {
       addToCart.mutate({ productId: data.id, quantity }, { onSuccess: () => destination && navigate(destination) });
@@ -52,13 +74,13 @@ export default function ProductDetail() {
     }
 
     addGuestCartItem({
-      id: product.id,
-      productId: product.id,
-      productSlug: product.slug,
-      productName: product.name,
-      productImage: product.image ?? null,
+      id: currentProduct.id,
+      productId: currentProduct.id,
+      productSlug: currentProduct.slug,
+      productName: currentProduct.name,
+      productImage: currentProduct.image ?? null,
       productUnitType: unit,
-      productUnitSize: product.unitSize ?? unit,
+      productUnitSize: currentProduct.unitSize ?? unit,
       quantity,
       unitPrice: String(price),
     });
@@ -84,31 +106,32 @@ export default function ProductDetail() {
           <div className="flex aspect-square items-center justify-center text-xl font-semibold text-muted-foreground">
             {product.image && !imageFailed ? (
               <img src={product.image} alt={product.name} className="h-full w-full object-cover" onError={() => setImageFailed(true)} />
-            ) : product.icon ? product.icon : <Package className="h-16 w-16" />}
+            ) : (
+              <Package className="h-16 w-16" />
+            )}
           </div>
         </div>
 
         <div className="space-y-5">
           <div className="flex flex-wrap gap-2">
-            <Badge variant="outline">{product.categoryName ?? product.category}</Badge>
+            <Badge variant="outline">{product.categoryName ?? "Uncategorized"}</Badge>
             <Badge variant="secondary">{product.grade ?? "Grade A"}</Badge>
           </div>
-          <p className="text-sm text-muted-foreground">⭐ {product.rating ?? "4.8"} (356 Reviews)</p>
           <div>
             <h1 className="text-3xl font-semibold tracking-tight">{product.name}</h1>
-            <p className="mt-1 text-sm text-muted-foreground">by {product.supplierName ?? product.supplier ?? "Fresh Farms"}</p>
+            <p className="mt-1 text-sm text-muted-foreground">by {product.supplierName ?? "Supplier"}</p>
           </div>
           <div className="flex flex-wrap items-baseline gap-3">
             <span className="text-3xl font-semibold text-emerald-700">{formatCurrency(price)}</span>
             <span className="text-sm text-muted-foreground">/ {unitLabels[unit] ?? unit}</span>
             {compareAt > 0 && <span className="text-lg text-muted-foreground line-through">{formatCurrency(compareAt)}</span>}
-            <Badge>{discount}% OFF</Badge>
+            {discount > 0 && <Badge>{discount}% OFF</Badge>}
           </div>
           <div className="grid gap-2 text-sm text-muted-foreground sm:grid-cols-2">
-            <p>Stock : {product.stock ?? "Backend"} {unit}</p>
+            <p>Stock : {product.stock ?? "Not set"} {unit}</p>
             <p>MOQ : {minQty} {unit}</p>
-            <p>Origin: {product.origin ?? "Himachal Pradesh"}</p>
-            <p>Delivery: {product.delivery ?? "Tomorrow"}</p>
+            <p>Origin: {product.origin ?? "Not set"}</p>
+            <p>Grade: {product.grade ?? "Not set"}</p>
           </div>
           <div className="space-y-2">
             <p className="text-sm font-medium">Quantity</p>
@@ -141,27 +164,47 @@ export default function ProductDetail() {
       </section>
 
       <DetailSection title="Product Description">
-        {product.description ?? "Fresh premium products harvested and packed for wholesale buyers."}
+        {product.description ?? "No description has been added for this product."}
       </DetailSection>
       <DetailSection title="Supplier Information">
         <div className="grid gap-2 text-sm sm:grid-cols-2">
-          <p>Supplier Name: {product.supplierName ?? product.supplier ?? "Fresh Farms"}</p>
-          <p>Address: Backend placeholder</p>
-          <p>Rating: {product.rating ?? "4.8"}</p>
-          <p>Contact: Backend placeholder</p>
+          <p>Supplier Name: {product.supplierName ?? "Not set"}</p>
+          <p>Address: {formatSupplierAddress(product)}</p>
+          <p>Contact: {product.supplierPhone ?? "Not set"}</p>
+          <p>Status: {product.inventoryStatus ?? product.status ?? "Not set"}</p>
         </div>
       </DetailSection>
-      <DetailSection title="Related Products">
-        <div className="flex flex-wrap gap-2">
-          {related.map((item) => (
-            <Link key={item.slug} to={`/products/${item.slug}`} className="rounded-md border px-3 py-2 text-sm hover:bg-muted">
-              {item.icon} {item.name}
-            </Link>
-          ))}
-        </div>
-      </DetailSection>
+      {related.length > 0 && (
+        <DetailSection title="Related Products">
+          <div className="flex flex-wrap gap-2">
+            {related.map((item) => (
+              <Link key={item.slug} to={`/products/${item.slug}`} className="rounded-md border px-3 py-2 text-sm hover:bg-muted">
+                {item.name}
+              </Link>
+            ))}
+          </div>
+        </DetailSection>
+      )}
     </div>
   );
+}
+
+function formatSupplierAddress(product: {
+  supplierAddressLine1?: string | null;
+  supplierAddressLine2?: string | null;
+  supplierCity?: string | null;
+  supplierState?: string | null;
+  supplierPostalCode?: string | null;
+  supplierCountry?: string | null;
+}) {
+  return [
+    product.supplierAddressLine1,
+    product.supplierAddressLine2,
+    product.supplierCity,
+    product.supplierState,
+    product.supplierPostalCode,
+    product.supplierCountry,
+  ].filter(Boolean).join(", ") || "Not set";
 }
 
 function DetailSection({ title, children }: { title: string; children: React.ReactNode }) {

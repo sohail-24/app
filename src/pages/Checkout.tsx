@@ -1,5 +1,6 @@
 import { useMemo, useState } from "react";
 import { Link, useNavigate } from "react-router";
+import { toast } from "sonner";
 import { trpc } from "@/providers/trpc";
 import { citiesByState, indianStates } from "@/lib/freshflowData";
 import { formatCurrency } from "@/lib/i18n";
@@ -17,8 +18,23 @@ import { Loader2, Package, ShoppingCart, Truck } from "lucide-react";
 
 export default function Checkout() {
   const navigate = useNavigate();
+  const utils = trpc.useUtils();
   const cartQuery = trpc.cart.list.useQuery(undefined, { retry: false });
-  const createOrder = trpc.order.create.useMutation({ onSuccess: (data) => navigate(`/orders/${data.orderId}`) });
+  const createOrder = trpc.order.create.useMutation({
+    onSuccess: async (data) => {
+      await Promise.all([
+        utils.cart.list.invalidate(),
+        utils.order.list.invalidate(),
+        utils.order.recent.invalidate(),
+        utils.order.stats.invalidate(),
+        utils.inventory.list.invalidate(),
+        utils.inventory.stats.invalidate(),
+        utils.report.dashboardSummary.invalidate(),
+      ]);
+      navigate(`/orders/${data.orderId}`);
+    },
+    onError: (error) => toast.error(error.message || "Could not create order."),
+  });
   const [form, setForm] = useState({
     contactName: "",
     mobileNumber: "",
@@ -34,6 +50,7 @@ export default function Checkout() {
   const cities = useMemo(() => citiesByState[form.state] ?? [], [form.state]);
   const items = cartQuery.data?.items ?? [];
   const subtotal = cartQuery.data?.total ?? 0;
+  const total = subtotal;
 
   if (cartQuery.isLoading) {
     return <div className="py-16 text-center"><Loader2 className="mx-auto h-8 w-8 animate-spin text-emerald-600" /></div>;
@@ -52,13 +69,12 @@ export default function Checkout() {
   function handleSubmit(event: React.FormEvent) {
     event.preventDefault();
     createOrder.mutate({
-      supplierId: 1,
       shippingAddressLine1: form.address,
       shippingCity: form.city,
       shippingState: form.state,
       shippingPostalCode: "000000",
       shippingCountry: "IND",
-      shippingMethod: form.slot || "Delivery Slot Placeholder",
+      shippingMethod: form.slot || undefined,
       buyerNotes: form.notes || undefined,
     });
   }
@@ -132,7 +148,7 @@ export default function Checkout() {
             </Label>
             <Button type="submit" className="h-11 w-full bg-emerald-600 hover:bg-emerald-700" disabled={createOrder.isPending || !form.confirmAddress || !form.agreeTerms}>
               {createOrder.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-              Save & Continue
+              Place Order
             </Button>
           </CardContent>
         </Card>
@@ -153,10 +169,10 @@ export default function Checkout() {
             </div>
             <Separator />
             <SummaryRow label="Subtotal" value={formatCurrency(subtotal)} />
-            <SummaryRow label="Shipping" value="Backend placeholder" muted />
-            <SummaryRow label="GST" value="Backend placeholder" muted />
+            <SummaryRow label="Shipping" value={formatCurrency(0)} muted />
+            <SummaryRow label="GST" value={formatCurrency(0)} muted />
             <Separator />
-            <SummaryRow label="Total" value="Backend placeholder" strong />
+            <SummaryRow label="Total" value={formatCurrency(total)} strong />
           </CardContent>
         </Card>
       </form>

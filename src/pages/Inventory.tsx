@@ -1,11 +1,13 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router";
+import { toast } from "sonner";
 import { trpc } from "@/providers/trpc";
 import { formatCurrency, formatDate, formatNumber } from "@/lib/i18n";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import {
   Select,
   SelectContent,
@@ -15,6 +17,7 @@ import {
 } from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Textarea } from "@/components/ui/textarea";
 import {
   AlertTriangle,
   ArrowDownLeft,
@@ -25,6 +28,7 @@ import {
   MapPin,
   Package,
   Plus,
+  Save,
   Search,
   SlidersHorizontal,
   TrendingDown,
@@ -54,6 +58,8 @@ const statusConfig: Record<string, { label: string; className: string }> = {
   },
 };
 
+type InventoryStatusFilter = "all" | "in_stock" | "low_stock" | "out_of_stock";
+
 type InventoryItem = {
   id: number;
   productId: number;
@@ -69,19 +75,84 @@ type InventoryItem = {
   quantityReserved: number;
   quantityAvailable: number;
   reorderLevel: number;
+  reorderQuantity: number;
   status: string;
+  notes: string | null;
+};
+
+type InventoryForm = {
+  supplierId: string;
+  quantityOnHand: string;
+  quantityReserved: string;
+  quantityAvailable: string;
+  reorderLevel: string;
+  reorderQuantity: string;
+  warehouseLocation: string;
+  batchNumber: string;
+  notes: string;
+};
+
+type ActionForm = {
+  quantity: string;
+  warehouseLocation: string;
+  notes: string;
 };
 
 export default function Inventory() {
   const [search, setSearch] = useState("");
-  const [status, setStatus] = useState("all");
+  const [status, setStatus] = useState<InventoryStatusFilter>("all");
+  const [selectedId, setSelectedId] = useState<number | null>(null);
+  const [form, setForm] = useState<InventoryForm>(() => emptyInventoryForm());
+  const [actionForm, setActionForm] = useState<ActionForm>({
+    quantity: "1",
+    warehouseLocation: "",
+    notes: "",
+  });
+  const utils = trpc.useUtils();
   const inventoryQuery = trpc.inventory.list.useQuery(
     { status: status !== "all" ? status : undefined },
     { retry: false },
   );
   const statsQuery = trpc.inventory.stats.useQuery(undefined, { retry: false });
+  const companiesQuery = trpc.company.list.useQuery(undefined, { retry: false });
+
+  const afterInventoryChange = async (message: string) => {
+    await Promise.all([
+      utils.inventory.list.invalidate(),
+      utils.inventory.stats.invalidate(),
+      utils.product.list.invalidate(),
+      utils.product.stats.invalidate(),
+      utils.order.list.invalidate(),
+      utils.order.recent.invalidate(),
+      utils.report.dashboardSummary.invalidate(),
+    ]);
+    toast.success(message);
+  };
+
+  const updateInventory = trpc.inventory.update.useMutation({
+    onSuccess: () => afterInventoryChange("Inventory saved."),
+    onError: (error) => toast.error(error.message || "Could not save inventory."),
+  });
+  const stockIn = trpc.inventory.stockIn.useMutation({
+    onSuccess: () => afterInventoryChange("Stock received."),
+    onError: (error) => toast.error(error.message || "Could not receive stock."),
+  });
+  const stockOut = trpc.inventory.stockOut.useMutation({
+    onSuccess: () => afterInventoryChange("Stock removed."),
+    onError: (error) => toast.error(error.message || "Could not remove stock."),
+  });
+  const adjustStock = trpc.inventory.adjustStock.useMutation({
+    onSuccess: () => afterInventoryChange("Stock adjusted."),
+    onError: (error) => toast.error(error.message || "Could not adjust stock."),
+  });
+  const transferStock = trpc.inventory.transfer.useMutation({
+    onSuccess: () => afterInventoryChange("Stock transferred."),
+    onError: (error) => toast.error(error.message || "Could not transfer stock."),
+  });
 
   const inventory = inventoryQuery.data ?? [];
+  const selected = inventory.find((item) => item.id === selectedId) ?? null;
+  const suppliers = (companiesQuery.data ?? []).filter((company) => company.type === "supplier" || company.type === "both");
   const filtered = useMemo(() => {
     const query = search.trim().toLowerCase();
     if (!query) return inventory;
@@ -95,6 +166,79 @@ export default function Inventory() {
   const lowStockItems = filtered.filter((item) => item.status === "low_stock" || item.status === "out_of_stock");
   const totalAvailable = filtered.reduce((total, item) => total + (item.quantityAvailable ?? 0), 0);
   const reserved = filtered.reduce((total, item) => total + (item.quantityReserved ?? 0), 0);
+
+  useEffect(() => {
+    if (!selected) return;
+    setForm({
+      supplierId: String(selected.supplierId),
+      quantityOnHand: String(selected.quantityOnHand),
+      quantityReserved: String(selected.quantityReserved),
+      quantityAvailable: String(selected.quantityAvailable),
+      reorderLevel: String(selected.reorderLevel),
+      reorderQuantity: String(selected.reorderQuantity),
+      warehouseLocation: selected.warehouseLocation ?? "",
+      batchNumber: selected.batchNumber ?? "",
+      notes: selected.notes ?? "",
+    });
+    setActionForm({
+      quantity: "1",
+      warehouseLocation: selected.warehouseLocation ?? "",
+      notes: "",
+    });
+  }, [selected]);
+
+  function saveSelectedInventory() {
+    if (!selected) return;
+    updateInventory.mutate({
+      id: selected.id,
+      data: {
+        supplierId: Number(form.supplierId),
+        quantityOnHand: wholeNumber(form.quantityOnHand),
+        quantityReserved: wholeNumber(form.quantityReserved),
+        quantityAvailable: wholeNumber(form.quantityAvailable),
+        reorderLevel: wholeNumber(form.reorderLevel),
+        reorderQuantity: wholeNumber(form.reorderQuantity),
+        warehouseLocation: form.warehouseLocation,
+        batchNumber: form.batchNumber,
+        notes: form.notes,
+      },
+    });
+  }
+
+  function runStockAction(action: "in" | "out" | "adjust-add" | "adjust-remove" | "transfer") {
+    if (!selected) return;
+    const quantity = Math.max(1, wholeNumber(actionForm.quantity));
+    if (action === "in") {
+      stockIn.mutate({
+        id: selected.id,
+        quantity,
+        warehouseLocation: actionForm.warehouseLocation || undefined,
+        notes: actionForm.notes || undefined,
+      });
+    }
+    if (action === "out") {
+      stockOut.mutate({ id: selected.id, quantity, notes: actionForm.notes || undefined });
+    }
+    if (action === "adjust-add" || action === "adjust-remove") {
+      adjustStock.mutate({
+        id: selected.id,
+        quantity,
+        adjustmentType: action === "adjust-add" ? "add" : "remove",
+        reason: actionForm.notes || undefined,
+      });
+    }
+    if (action === "transfer") {
+      if (!actionForm.warehouseLocation.trim()) {
+        toast.error("Enter the destination warehouse.");
+        return;
+      }
+      transferStock.mutate({
+        id: selected.id,
+        warehouseLocation: actionForm.warehouseLocation,
+        notes: actionForm.notes || undefined,
+      });
+    }
+  }
 
   return (
     <div className="mx-auto flex w-full max-w-[1500px] flex-col gap-5">
@@ -138,7 +282,7 @@ export default function Inventory() {
               className="pl-9"
             />
           </div>
-          <Select value={status} onValueChange={setStatus}>
+          <Select value={status} onValueChange={(value) => setStatus(value as InventoryStatusFilter)}>
             <SelectTrigger className="w-full lg:w-[190px]">
               <SlidersHorizontal className="mr-2 h-4 w-4" />
               <SelectValue placeholder="Status" />
@@ -165,7 +309,26 @@ export default function Inventory() {
         </TabsList>
 
         <TabsContent value="overview">
-          <InventoryTable items={filtered} loading={inventoryQuery.isLoading} />
+          <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_380px]">
+            <InventoryTable
+              items={filtered}
+              loading={inventoryQuery.isLoading}
+              selectedId={selectedId}
+              onSelect={setSelectedId}
+            />
+            <InventoryManager
+              item={selected}
+              form={form}
+              actionForm={actionForm}
+              suppliers={suppliers}
+              saving={updateInventory.isPending}
+              actionPending={stockIn.isPending || stockOut.isPending || adjustStock.isPending || transferStock.isPending}
+              onFormChange={(field, value) => setForm((current) => ({ ...current, [field]: value }))}
+              onActionChange={(field, value) => setActionForm((current) => ({ ...current, [field]: value }))}
+              onSave={saveSelectedInventory}
+              onAction={runStockAction}
+            />
+          </div>
         </TabsContent>
         <TabsContent value="stock-in">
           <MovementPanel
@@ -254,10 +417,14 @@ function InventoryMetric({
 function InventoryTable({
   items,
   loading,
+  selectedId,
+  onSelect,
   emptyTitle = "No inventory records found",
 }: {
   items: InventoryItem[];
   loading: boolean;
+  selectedId?: number | null;
+  onSelect?: (id: number) => void;
   emptyTitle?: string;
 }) {
   if (loading) {
@@ -300,11 +467,12 @@ function InventoryTable({
               <TableHead>Reorder</TableHead>
               <TableHead>Status</TableHead>
               <TableHead className="pr-4">Last Count</TableHead>
+              {onSelect && <TableHead className="pr-4 text-right">Manage</TableHead>}
             </TableRow>
           </TableHeader>
           <TableBody>
             {items.map((item) => (
-              <TableRow key={item.id}>
+              <TableRow key={item.id} className={selectedId === item.id ? "bg-muted/60" : ""}>
                 <TableCell className="pl-4">
                   <div className="flex min-w-[240px] items-center gap-3">
                     <InventoryImage src={item.productImage} alt={item.productName ?? "Product"} />
@@ -328,10 +496,135 @@ function InventoryTable({
                   <InventoryStatus status={item.status} />
                 </TableCell>
                 <TableCell className="pr-4">{formatDate(item.lastCountedAt ?? item.updatedAt)}</TableCell>
+                {onSelect && (
+                  <TableCell className="pr-4 text-right">
+                    <Button type="button" variant={selectedId === item.id ? "default" : "outline"} size="sm" onClick={() => onSelect(item.id)}>
+                      Manage
+                    </Button>
+                  </TableCell>
+                )}
               </TableRow>
             ))}
           </TableBody>
         </Table>
+      </CardContent>
+    </Card>
+  );
+}
+
+function InventoryManager({
+  item,
+  form,
+  actionForm,
+  suppliers,
+  saving,
+  actionPending,
+  onFormChange,
+  onActionChange,
+  onSave,
+  onAction,
+}: {
+  item: InventoryItem | null;
+  form: InventoryForm;
+  actionForm: ActionForm;
+  suppliers: Array<{ id: number; name: string }>;
+  saving: boolean;
+  actionPending: boolean;
+  onFormChange: (field: keyof InventoryForm, value: string) => void;
+  onActionChange: (field: keyof ActionForm, value: string) => void;
+  onSave: () => void;
+  onAction: (action: "in" | "out" | "adjust-add" | "adjust-remove" | "transfer") => void;
+}) {
+  if (!item) {
+    return (
+      <Card>
+        <CardContent className="flex min-h-[420px] flex-col items-center justify-center p-6 text-center">
+          <Warehouse className="mb-3 h-10 w-10 text-muted-foreground/50" />
+          <h3 className="font-semibold">Select inventory</h3>
+          <p className="mt-1 text-sm text-muted-foreground">
+            Choose an item to edit stock, warehouse, supplier, batch, and reorder settings.
+          </p>
+        </CardContent>
+      </Card>
+    );
+  }
+
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle className="text-base">Manage {item.productName ?? `Product #${item.productId}`}</CardTitle>
+        <p className="text-sm text-muted-foreground">
+          Available stock is recalculated from on-hand and reserved quantities when saved.
+        </p>
+      </CardHeader>
+      <CardContent className="space-y-5">
+        <div className="grid gap-3 sm:grid-cols-2">
+          <InventoryField label="On Hand">
+            <Input type="number" min="0" value={form.quantityOnHand} onChange={(event) => onFormChange("quantityOnHand", event.target.value)} />
+          </InventoryField>
+          <InventoryField label="Available">
+            <Input type="number" min="0" value={form.quantityAvailable} onChange={(event) => onFormChange("quantityAvailable", event.target.value)} />
+          </InventoryField>
+          <InventoryField label="Reserved">
+            <Input type="number" min="0" value={form.quantityReserved} onChange={(event) => onFormChange("quantityReserved", event.target.value)} />
+          </InventoryField>
+          <InventoryField label="Reorder Level">
+            <Input type="number" min="0" value={form.reorderLevel} onChange={(event) => onFormChange("reorderLevel", event.target.value)} />
+          </InventoryField>
+          <InventoryField label="Reorder Qty">
+            <Input type="number" min="0" value={form.reorderQuantity} onChange={(event) => onFormChange("reorderQuantity", event.target.value)} />
+          </InventoryField>
+          <InventoryField label="Supplier">
+            <Select value={form.supplierId} onValueChange={(value) => onFormChange("supplierId", value)}>
+              <SelectTrigger><SelectValue placeholder="Supplier" /></SelectTrigger>
+              <SelectContent>
+                {suppliers.map((supplier) => (
+                  <SelectItem key={supplier.id} value={String(supplier.id)}>{supplier.name}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </InventoryField>
+          <InventoryField label="Warehouse">
+            <Input value={form.warehouseLocation} onChange={(event) => onFormChange("warehouseLocation", event.target.value)} />
+          </InventoryField>
+          <InventoryField label="Batch">
+            <Input value={form.batchNumber} onChange={(event) => onFormChange("batchNumber", event.target.value)} />
+          </InventoryField>
+        </div>
+        <InventoryField label="Notes">
+          <Textarea value={form.notes} onChange={(event) => onFormChange("notes", event.target.value)} />
+        </InventoryField>
+        <Button className="w-full" onClick={onSave} disabled={saving}>
+          <Save className="mr-2 h-4 w-4" />
+          {saving ? "Saving..." : "Save Inventory Changes"}
+        </Button>
+
+        <div className="rounded-lg border p-3">
+          <h4 className="text-sm font-semibold">Stock Actions</h4>
+          <div className="mt-3 grid gap-3 sm:grid-cols-2">
+            <InventoryField label="Quantity">
+              <Input type="number" min="1" value={actionForm.quantity} onChange={(event) => onActionChange("quantity", event.target.value)} />
+            </InventoryField>
+            <InventoryField label="Warehouse">
+              <Input value={actionForm.warehouseLocation} onChange={(event) => onActionChange("warehouseLocation", event.target.value)} />
+            </InventoryField>
+          </div>
+          <div className="mt-3">
+            <InventoryField label="Reason">
+              <Textarea value={actionForm.notes} onChange={(event) => onActionChange("notes", event.target.value)} />
+            </InventoryField>
+          </div>
+          <div className="mt-3 grid gap-2 sm:grid-cols-2">
+            <Button variant="outline" onClick={() => onAction("in")} disabled={actionPending}>Stock In</Button>
+            <Button variant="outline" onClick={() => onAction("out")} disabled={actionPending}>Stock Out</Button>
+            <Button variant="outline" onClick={() => onAction("adjust-add")} disabled={actionPending}>Adjust Up</Button>
+            <Button variant="outline" onClick={() => onAction("adjust-remove")} disabled={actionPending}>Adjust Down</Button>
+            <Button className="sm:col-span-2" variant="outline" onClick={() => onAction("transfer")} disabled={actionPending}>
+              <ArrowRightLeft className="mr-2 h-4 w-4" />
+              Transfer Warehouse
+            </Button>
+          </div>
+        </div>
       </CardContent>
     </Card>
   );
@@ -442,4 +735,32 @@ function Mini({ label, value }: { label: string; value: string }) {
       <p className="mt-1 font-medium">{value}</p>
     </div>
   );
+}
+
+function InventoryField({ label, children }: { label: string; children: React.ReactNode }) {
+  return (
+    <div className="space-y-2">
+      <Label className="text-xs text-muted-foreground">{label}</Label>
+      {children}
+    </div>
+  );
+}
+
+function wholeNumber(value: string) {
+  const parsed = Number(value);
+  return Number.isFinite(parsed) ? Math.max(0, Math.floor(parsed)) : 0;
+}
+
+function emptyInventoryForm(): InventoryForm {
+  return {
+    supplierId: "",
+    quantityOnHand: "0",
+    quantityReserved: "0",
+    quantityAvailable: "0",
+    reorderLevel: "10",
+    reorderQuantity: "100",
+    warehouseLocation: "",
+    batchNumber: "",
+    notes: "",
+  };
 }

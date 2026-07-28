@@ -18,7 +18,10 @@ const Cart = lazy(() => import("./pages/Cart"));
 const Checkout = lazy(() => import("./pages/Checkout"));
 const Orders = lazy(() => import("./pages/Orders"));
 const OrderDetail = lazy(() => import("./pages/OrderDetail"));
+const Invoices = lazy(() => import("./pages/Invoices"));
+const InvoiceDetail = lazy(() => import("./pages/InvoiceDetail"));
 const Inventory = lazy(() => import("./pages/Inventory"));
+const Warehouse = lazy(() => import("./pages/Warehouse"));
 const Reports = lazy(() => import("./pages/Reports"));
 const Profile = lazy(() => import("./pages/Profile"));
 const Settings = lazy(() => import("./pages/Settings"));
@@ -156,10 +159,34 @@ function AppRoutes() {
             }
           />
           <Route
+            path="/invoices"
+            element={
+              <OwnerRoute>
+                <Invoices />
+              </OwnerRoute>
+            }
+          />
+          <Route
+            path="/invoices/:id"
+            element={
+              <OwnerRoute>
+                <InvoiceDetail />
+              </OwnerRoute>
+            }
+          />
+          <Route
             path="/inventory"
             element={
               <OwnerRoute>
                 <Inventory />
+              </OwnerRoute>
+            }
+          />
+          <Route
+            path="/warehouse"
+            element={
+              <OwnerRoute>
+                <Warehouse />
               </OwnerRoute>
             }
           />

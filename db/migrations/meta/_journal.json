@@ -8,6 +8,41 @@
       "when": 1784537591309,
       "tag": "0000_fat_nekra",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1785140000000,
+      "tag": "0001_warehouse_module",
+      "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1785141000000,
+      "tag": "0002_orders_delivery_estimate",
+      "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1785142000000,
+      "tag": "0003_invoice_module",
+      "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1785228000000,
+      "tag": "0004_user_profile_fields",
+      "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1785204516743,
+      "tag": "0005_broken_exodus",
+      "breakpoints": true
     }
   ]
 }

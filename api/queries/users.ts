@@ -57,6 +57,47 @@ export async function updateLastSignIn(userId: number) {
     .where(eq(schema.users.id, userId));
 }
 
+export async function updateUserProfile(
+  userId: number,
+  data: Partial<{
+    name: string;
+    phone: string | null;
+    dateOfBirth: Date | null;
+    gender: "male" | "female" | "other" | "prefer_not_to_say" | null;
+    addressLine1: string | null;
+    city: string | null;
+    state: string | null;
+    country: string | null;
+    postalCode: string | null;
+    themePreference: "system" | "light" | "dark";
+  }>,
+) {
+  const [updated] = await getDb()
+    .update(schema.users)
+    .set({ ...data, updatedAt: new Date() })
+    .where(eq(schema.users.id, userId))
+    .returning();
+
+  return updated ?? null;
+}
+
+export async function updateUserAvatar(userId: number, avatar: string | null) {
+  const [updated] = await getDb()
+    .update(schema.users)
+    .set({ avatar, updatedAt: new Date() })
+    .where(eq(schema.users.id, userId))
+    .returning();
+
+  return updated ?? null;
+}
+
+export async function updateUserPasswordHash(userId: number, passwordHash: string) {
+  await getDb()
+    .update(schema.users)
+    .set({ passwordHash, updatedAt: new Date() })
+    .where(eq(schema.users.id, userId));
+}
+
 export async function upsertUser(data: InsertUser) {
   const values = { ...data };
   const updateSet: Partial<InsertUser> = {
