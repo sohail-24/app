@@ -2,6 +2,7 @@ import { relations } from "drizzle-orm";
 import {
   users,
   companies,
+  customers,
   categories,
   products,
   cartItems,
@@ -12,6 +13,9 @@ import {
   inventory,
   warehouses,
   warehouseStockMovements,
+  deliveryZones,
+  gstConfigurations,
+  shippingMethods,
 } from "./schema";
 
 // ─────────────────────────────────────────────────────────────
@@ -29,6 +33,8 @@ export const usersRelations = relations(users, ({ one }) => ({
 // Companies have many Users and Products
 export const companiesRelations = relations(companies, ({ many }) => ({
   users: many(users),
+  managedCustomers: many(customers, { relationName: "customerOwner" }),
+  customerProfiles: many(customers, { relationName: "customerBuyerCompany" }),
   products: many(products),
   ordersAsBuyer: many(orders, { relationName: "buyer" }),
   ordersAsSupplier: many(orders, { relationName: "supplier" }),
@@ -36,6 +42,22 @@ export const companiesRelations = relations(companies, ({ many }) => ({
   inventoryItems: many(inventory),
   warehouses: many(warehouses),
   warehouseStockMovements: many(warehouseStockMovements),
+  deliveryZones: many(deliveryZones),
+  gstConfigurations: many(gstConfigurations),
+  shippingMethods: many(shippingMethods),
+}));
+
+export const customersRelations = relations(customers, ({ one }) => ({
+  ownerCompany: one(companies, {
+    fields: [customers.ownerCompanyId],
+    references: [companies.id],
+    relationName: "customerOwner",
+  }),
+  buyerCompany: one(companies, {
+    fields: [customers.buyerCompanyId],
+    references: [companies.id],
+    relationName: "customerBuyerCompany",
+  }),
 }));
 
 // Categories can have subcategories and products
@@ -151,6 +173,8 @@ export const warehousesRelations = relations(warehouses, ({ one, many }) => ({
     references: [companies.id],
   }),
   movements: many(warehouseStockMovements),
+  deliveryZones: many(deliveryZones),
+  shippingMethods: many(shippingMethods),
 }));
 
 // Warehouse stock movements belong to Warehouse, Company, Product, Inventory, and User
@@ -179,3 +203,37 @@ export const warehouseStockMovementsRelations = relations(
     }),
   }),
 );
+
+export const deliveryZonesRelations = relations(deliveryZones, ({ one, many }) => ({
+  company: one(companies, {
+    fields: [deliveryZones.companyId],
+    references: [companies.id],
+  }),
+  warehouse: one(warehouses, {
+    fields: [deliveryZones.warehouseId],
+    references: [warehouses.id],
+  }),
+  shippingMethods: many(shippingMethods),
+}));
+
+export const gstConfigurationsRelations = relations(gstConfigurations, ({ one }) => ({
+  company: one(companies, {
+    fields: [gstConfigurations.companyId],
+    references: [companies.id],
+  }),
+}));
+
+export const shippingMethodsRelations = relations(shippingMethods, ({ one }) => ({
+  company: one(companies, {
+    fields: [shippingMethods.companyId],
+    references: [companies.id],
+  }),
+  warehouse: one(warehouses, {
+    fields: [shippingMethods.warehouseId],
+    references: [warehouses.id],
+  }),
+  deliveryZone: one(deliveryZones, {
+    fields: [shippingMethods.deliveryZoneId],
+    references: [deliveryZones.id],
+  }),
+}));

@@ -36,6 +36,7 @@ import {
   Package,
   Save,
   Search,
+  Trash2,
   Warehouse as WarehouseIcon,
 } from "lucide-react";
 import {
@@ -52,10 +53,18 @@ type StockStatus = "all" | "in_stock" | "low_stock" | "out_of_stock";
 type MovementType = "receive" | "dispatch";
 
 type WarehouseForm = {
+  id?: number;
   name: string;
   code: string;
   description: string;
   address: string;
+  city: string;
+  state: string;
+  postalCode: string;
+  country: string;
+  capacityUnits: string;
+  usedCapacityUnits: string;
+  isDefault: boolean;
   contactPerson: string;
   contactNumber: string;
   status: WarehouseStatus;
@@ -75,6 +84,13 @@ const emptyWarehouseForm: WarehouseForm = {
   code: "WH-001",
   description: "",
   address: "",
+  city: "",
+  state: "",
+  postalCode: "",
+  country: "India",
+  capacityUnits: "0",
+  usedCapacityUnits: "0",
+  isDefault: true,
   contactPerson: "",
   contactNumber: "",
   status: "active",
@@ -107,6 +123,7 @@ export default function Warehouse() {
   const [movementForm, setMovementForm] = useState<MovementForm>(emptyMovementForm);
 
   const warehouseQuery = trpc.warehouse.get.useQuery(undefined, { retry: false });
+  const warehouseListQuery = trpc.warehouse.list.useQuery(undefined, { retry: false });
   const statsQuery = trpc.warehouse.stats.useQuery(undefined, { retry: false });
   const stockQuery = trpc.warehouse.stock.useQuery(
     {
@@ -126,6 +143,7 @@ export default function Warehouse() {
   const warehouse = warehouseQuery.data ?? null;
   const stock = stockQuery.data ?? [];
   const movements = movementsQuery.data ?? [];
+  const warehouseList = warehouseListQuery.data ?? [];
   const warehouseMissing = warehouseQuery.error?.data?.code === "NOT_FOUND";
 
   const productOptions = useMemo(
@@ -150,6 +168,29 @@ export default function Warehouse() {
     },
     onError: (error) => toast.error(error.message || "Could not update warehouse."),
   });
+  const createWarehouse = trpc.warehouse.create.useMutation({
+    onSuccess: async () => {
+      await invalidateWarehouseConfig();
+      toast.success("Warehouse created.");
+      setEditing(false);
+    },
+    onError: (error) => toast.error(error.message || "Could not create warehouse."),
+  });
+  const updateWarehouseById = trpc.warehouse.updateById.useMutation({
+    onSuccess: async () => {
+      await invalidateWarehouseConfig();
+      toast.success("Warehouse updated.");
+      setEditing(false);
+    },
+    onError: (error) => toast.error(error.message || "Could not update warehouse."),
+  });
+  const deleteWarehouse = trpc.warehouse.delete.useMutation({
+    onSuccess: async () => {
+      await invalidateWarehouseConfig();
+      toast.success("Warehouse marked inactive.");
+    },
+    onError: (error) => toast.error(error.message || "Could not delete warehouse."),
+  });
 
   const receiveStock = trpc.warehouse.receive.useMutation({
     onSuccess: async () => {
@@ -168,6 +209,13 @@ export default function Warehouse() {
     },
     onError: (error) => toast.error(error.message || "Could not dispatch stock."),
   });
+  const assignStock = trpc.warehouse.assignStock.useMutation({
+    onSuccess: async () => {
+      await invalidateWarehouseData();
+      toast.success("Stock assigned to warehouse.");
+    },
+    onError: (error) => toast.error(error.message || "Could not assign stock."),
+  });
 
   async function invalidateWarehouseData() {
     await utils.warehouse.stock.invalidate();
@@ -177,20 +225,82 @@ export default function Warehouse() {
     await utils.inventory.stats.invalidate();
   }
 
+  async function invalidateWarehouseConfig() {
+    await Promise.all([
+      utils.warehouse.get.invalidate(),
+      utils.warehouse.list.invalidate(),
+      utils.warehouse.stats.invalidate(),
+    ]);
+  }
+
   function startEditing() {
     setWarehouseForm(
       warehouse
         ? {
+            id: warehouse.id,
             name: warehouse.name,
             code: warehouse.code ?? "",
             description: warehouse.description ?? "",
             address: warehouse.address,
+            city: warehouse.city ?? "",
+            state: warehouse.state ?? "",
+            postalCode: warehouse.postalCode ?? "",
+            country: warehouse.country ?? "India",
+            capacityUnits: String(warehouse.capacityUnits ?? 0),
+            usedCapacityUnits: String(warehouse.usedCapacityUnits ?? 0),
+            isDefault: warehouse.isDefault,
             contactPerson: warehouse.contactPerson ?? "",
             contactNumber: warehouse.contactNumber ?? "",
             status: warehouse.status,
           }
         : emptyWarehouseForm,
     );
+    setEditing(true);
+  }
+
+  function startCreating() {
+    setWarehouseForm({
+      ...emptyWarehouseForm,
+      code: `WH-${String(warehouseList.length + 1).padStart(3, "0")}`,
+      isDefault: warehouseList.length === 0,
+    });
+    setEditing(true);
+  }
+
+  function editWarehouse(item: {
+    id: number;
+    name: string;
+    code: string | null;
+    description?: string | null;
+    address: string;
+    city: string | null;
+    state: string | null;
+    postalCode: string | null;
+    country?: string | null;
+    capacityUnits: number;
+    usedCapacityUnits: number;
+    isDefault: boolean;
+    contactPerson?: string | null;
+    contactNumber?: string | null;
+    status: WarehouseStatus;
+  }) {
+    setWarehouseForm({
+      id: item.id,
+      name: item.name,
+      code: item.code ?? "",
+      description: item.description ?? "",
+      address: item.address,
+      city: item.city ?? "",
+      state: item.state ?? "",
+      postalCode: item.postalCode ?? "",
+      country: item.country ?? "India",
+      capacityUnits: String(item.capacityUnits ?? 0),
+      usedCapacityUnits: String(item.usedCapacityUnits ?? 0),
+      isDefault: item.isDefault,
+      contactPerson: item.contactPerson ?? "",
+      contactNumber: item.contactNumber ?? "",
+      status: item.status,
+    });
     setEditing(true);
   }
 
@@ -203,15 +313,29 @@ export default function Warehouse() {
       toast.error("Warehouse address is required.");
       return;
     }
-    updateWarehouse.mutate({
+    const payload = {
       name: warehouseForm.name.trim(),
       code: warehouseForm.code.trim(),
       description: warehouseForm.description.trim(),
       address: warehouseForm.address.trim(),
+      city: warehouseForm.city.trim(),
+      state: warehouseForm.state.trim(),
+      postalCode: warehouseForm.postalCode.trim(),
+      country: warehouseForm.country.trim(),
+      capacityUnits: Math.max(0, Number(warehouseForm.capacityUnits) || 0),
+      usedCapacityUnits: Math.max(0, Number(warehouseForm.usedCapacityUnits) || 0),
+      isDefault: warehouseForm.isDefault,
       contactPerson: warehouseForm.contactPerson.trim(),
       contactNumber: warehouseForm.contactNumber.trim(),
       status: warehouseForm.status,
-    });
+    };
+    if (warehouseForm.id) {
+      updateWarehouseById.mutate({ id: warehouseForm.id, ...payload });
+    } else if (warehouse) {
+      updateWarehouse.mutate(payload);
+    } else {
+      createWarehouse.mutate(payload);
+    }
   }
 
   function openMovementDialog(type: MovementType, productId?: number) {
@@ -276,6 +400,10 @@ export default function Warehouse() {
           <h1 className="text-2xl font-semibold tracking-tight sm:text-3xl">Warehouse</h1>
         </div>
         <div className="flex flex-wrap gap-2">
+          <Button variant="outline" onClick={startCreating}>
+            <WarehouseIcon className="mr-2 h-4 w-4" />
+            Add Warehouse
+          </Button>
           <Button onClick={() => openMovementDialog("receive")} disabled={!warehouse || warehouse.status !== "active"}>
             <ArrowDownLeft className="mr-2 h-4 w-4" />
             Receive Stock
@@ -315,9 +443,13 @@ export default function Warehouse() {
           <WarehouseInformation
             editing={editing || !warehouse}
             warehouse={warehouse}
+            warehouses={warehouseList}
             form={warehouseForm}
-            loading={updateWarehouse.isPending}
+            loading={updateWarehouse.isPending || createWarehouse.isPending || updateWarehouseById.isPending}
             onEdit={startEditing}
+            onCreate={startCreating}
+            onSelect={editWarehouse}
+            onDelete={(id) => deleteWarehouse.mutate({ id })}
             onCancel={() => setEditing(false)}
             onSave={saveWarehouse}
             onChange={(field, value) => setWarehouseForm((current) => ({ ...current, [field]: value }))}
@@ -361,9 +493,11 @@ export default function Warehouse() {
             <CardContent className="p-0">
               <StockTable
                 stock={stock}
+                warehouses={warehouseList.filter((item) => item.status === "active")}
                 loading={stockQuery.isLoading}
                 onReceive={(productId) => openMovementDialog("receive", productId)}
                 onDispatch={(productId) => openMovementDialog("dispatch", productId)}
+                onAssign={(inventoryId, warehouseId) => assignStock.mutate({ inventoryId, warehouseId })}
               />
             </CardContent>
           </Card>
@@ -423,32 +557,46 @@ export default function Warehouse() {
 function WarehouseInformation({
   editing,
   warehouse,
+  warehouses,
   form,
   loading,
   onEdit,
+  onCreate,
+  onSelect,
+  onDelete,
   onCancel,
   onSave,
   onChange,
 }: {
   editing: boolean;
-  warehouse: { name: string; code: string | null; description: string | null; address: string; contactPerson: string | null; contactNumber: string | null; status: WarehouseStatus } | null;
+  warehouse: { name: string; code: string | null; description: string | null; address: string; city: string | null; state: string | null; postalCode: string | null; country: string | null; capacityUnits: number; usedCapacityUnits: number; isDefault: boolean; contactPerson: string | null; contactNumber: string | null; status: WarehouseStatus } | null;
+  warehouses: Array<{ id: number; name: string; code: string | null; address: string; city: string | null; state: string | null; postalCode: string | null; capacityUnits: number; usedCapacityUnits: number; isDefault: boolean; status: WarehouseStatus }>;
   form: WarehouseForm;
   loading: boolean;
   onEdit: () => void;
+  onCreate: () => void;
+  onSelect: (warehouse: { id: number; name: string; code: string | null; description?: string | null; address: string; city: string | null; state: string | null; postalCode: string | null; country?: string | null; capacityUnits: number; usedCapacityUnits: number; isDefault: boolean; contactPerson?: string | null; contactNumber?: string | null; status: WarehouseStatus }) => void;
+  onDelete: (id: number) => void;
   onCancel: () => void;
   onSave: () => void;
-  onChange: (field: keyof WarehouseForm, value: string) => void;
+  onChange: (field: keyof WarehouseForm, value: string | boolean) => void;
 }) {
   return (
     <Card>
       <CardHeader className="flex flex-row items-center justify-between gap-3">
         <CardTitle className="text-base">Warehouse Information</CardTitle>
-        {!editing && (
-          <Button variant="outline" size="sm" onClick={onEdit}>
-            <Edit className="mr-2 h-4 w-4" />
-            Edit
+        <div className="flex gap-2">
+          <Button variant="outline" size="sm" onClick={onCreate}>
+            <WarehouseIcon className="mr-2 h-4 w-4" />
+            Add
           </Button>
-        )}
+          {!editing && (
+            <Button variant="outline" size="sm" onClick={onEdit}>
+              <Edit className="mr-2 h-4 w-4" />
+              Edit
+            </Button>
+          )}
+        </div>
       </CardHeader>
       <CardContent className="space-y-4">
         {editing ? (
@@ -466,6 +614,24 @@ function WarehouseInformation({
               <Field label="Contact Number">
                 <Input value={form.contactNumber} onChange={(event) => onChange("contactNumber", event.target.value)} />
               </Field>
+              <Field label="City">
+                <Input value={form.city} onChange={(event) => onChange("city", event.target.value)} />
+              </Field>
+              <Field label="State">
+                <Input value={form.state} onChange={(event) => onChange("state", event.target.value)} />
+              </Field>
+              <Field label="Postal Code">
+                <Input value={form.postalCode} onChange={(event) => onChange("postalCode", event.target.value)} />
+              </Field>
+              <Field label="Country">
+                <Input value={form.country} onChange={(event) => onChange("country", event.target.value)} />
+              </Field>
+              <Field label="Capacity Units">
+                <Input type="number" min={0} value={form.capacityUnits} onChange={(event) => onChange("capacityUnits", event.target.value)} />
+              </Field>
+              <Field label="Used Capacity">
+                <Input type="number" min={0} value={form.usedCapacityUnits} onChange={(event) => onChange("usedCapacityUnits", event.target.value)} />
+              </Field>
               <Field label="Status">
                 <Select value={form.status} onValueChange={(value) => onChange("status", value)}>
                   <SelectTrigger>
@@ -477,6 +643,10 @@ function WarehouseInformation({
                   </SelectContent>
                 </Select>
               </Field>
+              <label className="flex items-center justify-between rounded-md border p-3 text-sm">
+                <span>Default warehouse</span>
+                <input type="checkbox" checked={form.isDefault} onChange={(event) => onChange("isDefault", event.target.checked)} />
+              </label>
             </div>
             <Field label="Address" required>
               <Textarea value={form.address} onChange={(event) => onChange("address", event.target.value)} />
@@ -493,13 +663,46 @@ function WarehouseInformation({
             </div>
           </>
         ) : (
-          <div className="grid gap-3 sm:grid-cols-2">
-            <ReadOnly label="Name" value={warehouse?.name} />
-            <ReadOnly label="Code" value={warehouse?.code} />
-            <ReadOnly label="Status" value={<WarehouseStatusBadge status={warehouse?.status ?? "inactive"} />} />
-            <ReadOnly label="Contact" value={warehouse?.contactPerson} />
-            <ReadOnly label="Phone" value={warehouse?.contactNumber} />
-            <ReadOnly label="Address" value={warehouse?.address} className="sm:col-span-2" />
+          <div className="space-y-4">
+            <div className="grid gap-3 sm:grid-cols-2">
+              <ReadOnly label="Name" value={warehouse?.name} />
+              <ReadOnly label="Code" value={warehouse?.code} />
+              <ReadOnly label="Status" value={<WarehouseStatusBadge status={warehouse?.status ?? "inactive"} />} />
+              <ReadOnly label="Default" value={warehouse?.isDefault ? "Yes" : "No"} />
+              <ReadOnly label="Contact" value={warehouse?.contactPerson} />
+              <ReadOnly label="Phone" value={warehouse?.contactNumber} />
+              <ReadOnly label="Capacity" value={`${formatNumber(warehouse?.usedCapacityUnits ?? 0)} / ${formatNumber(warehouse?.capacityUnits ?? 0)}`} />
+              <ReadOnly label="Location" value={[warehouse?.city, warehouse?.state, warehouse?.postalCode].filter(Boolean).join(", ")} />
+              <ReadOnly label="Address" value={warehouse?.address} className="sm:col-span-2" />
+            </div>
+            {!!warehouses.length && (
+              <div className="space-y-2">
+                <h3 className="text-sm font-semibold">Warehouse Selection</h3>
+                <div className="grid gap-2">
+                  {warehouses.map((item) => (
+                    <div key={item.id} className="flex items-center justify-between gap-3 rounded-md border p-3">
+                      <button type="button" className="min-w-0 text-left" onClick={() => onSelect(item)}>
+                        <div className="flex items-center gap-2">
+                          <span className="font-medium">{item.name}</span>
+                          {item.isDefault && <Badge variant="outline" className="rounded-md">Default</Badge>}
+                        </div>
+                        <div className="text-xs text-muted-foreground">
+                          {[item.code, item.city, item.postalCode].filter(Boolean).join(" / ") || item.address}
+                        </div>
+                      </button>
+                      <div className="flex gap-1">
+                        <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => onSelect(item)}>
+                          <Edit className="h-4 w-4" />
+                        </Button>
+                        <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive" onClick={() => onDelete(item.id)} disabled={item.isDefault}>
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
           </div>
         )}
       </CardContent>
@@ -509,11 +712,14 @@ function WarehouseInformation({
 
 function StockTable({
   stock,
+  warehouses,
   loading,
   onReceive,
   onDispatch,
+  onAssign,
 }: {
   stock: Array<{
+    inventoryId: number;
     productId: number;
     productName: string | null;
     availableStock: number;
@@ -523,9 +729,11 @@ function StockTable({
     warehouseLocation: string | null;
     lastUpdated: Date;
   }>;
+  warehouses: Array<{ id: number; name: string }>;
   loading: boolean;
   onReceive: (productId: number) => void;
   onDispatch: (productId: number) => void;
+  onAssign: (inventoryId: number, warehouseId: number) => void;
 }) {
   if (loading) {
     return <TableSkeleton columns={6} />;
@@ -543,6 +751,7 @@ function StockTable({
             <TableHead>Reserved</TableHead>
             <TableHead>Status</TableHead>
             <TableHead>Warehouse</TableHead>
+            <TableHead>Assign</TableHead>
             <TableHead className="text-right">Action</TableHead>
           </TableRow>
         </TableHeader>
@@ -557,6 +766,20 @@ function StockTable({
               <TableCell>{formatNumber(item.reservedStock)}</TableCell>
               <TableCell><StockStatusBadge status={item.status} /></TableCell>
               <TableCell>{item.warehouseLocation ?? "Main warehouse"}</TableCell>
+              <TableCell>
+                <Select onValueChange={(value) => onAssign(item.inventoryId, Number(value))}>
+                  <SelectTrigger className="w-[180px]">
+                    <SelectValue placeholder="Move stock" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {warehouses.map((warehouse) => (
+                      <SelectItem key={warehouse.id} value={String(warehouse.id)}>
+                        {warehouse.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </TableCell>
               <TableCell>
                 <div className="flex justify-end gap-2">
                   <Button variant="outline" size="sm" onClick={() => onReceive(item.productId)}>Receive</Button>

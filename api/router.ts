@@ -10,6 +10,10 @@ import { warehouseRouter } from "./warehouseRouter";
 import { invoiceRouter } from "./invoiceRouter";
 import { reportRouter } from "./reportRouter";
 import { profileRouter } from "./profileRouter";
+import { customerRouter } from "./customerRouter";
+import { deliveryZoneRouter } from "./deliveryZoneRouter";
+import { gstRouter } from "./gstRouter";
+import { shippingRouter } from "./shippingRouter";
 
 export const appRouter = createRouter({
   ping: publicQuery.query(() => ({ ok: true, ts: Date.now() })),
@@ -26,6 +30,10 @@ export const appRouter = createRouter({
   invoice: invoiceRouter,
   report: reportRouter,
   profile: profileRouter,
+  customer: customerRouter,
+  deliveryZone: deliveryZoneRouter,
+  gst: gstRouter,
+  shipping: shippingRouter,
 });
 
 export type AppRouter = typeof appRouter;

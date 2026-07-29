@@ -22,6 +22,10 @@ const Invoices = lazy(() => import("./pages/Invoices"));
 const InvoiceDetail = lazy(() => import("./pages/InvoiceDetail"));
 const Inventory = lazy(() => import("./pages/Inventory"));
 const Warehouse = lazy(() => import("./pages/Warehouse"));
+const Customers = lazy(() => import("./pages/Customers"));
+const DeliveryZones = lazy(() => import("./pages/DeliveryZones"));
+const GstRules = lazy(() => import("./pages/GstRules"));
+const ShippingRules = lazy(() => import("./pages/ShippingRules"));
 const Reports = lazy(() => import("./pages/Reports"));
 const Profile = lazy(() => import("./pages/Profile"));
 const Settings = lazy(() => import("./pages/Settings"));
@@ -191,6 +195,38 @@ function AppRoutes() {
             }
           />
           <Route
+            path="/customers"
+            element={
+              <OwnerRoute>
+                <Customers />
+              </OwnerRoute>
+            }
+          />
+          <Route
+            path="/delivery-zones"
+            element={
+              <OwnerRoute>
+                <DeliveryZones />
+              </OwnerRoute>
+            }
+          />
+          <Route
+            path="/gst-rules"
+            element={
+              <OwnerRoute>
+                <GstRules />
+              </OwnerRoute>
+            }
+          />
+          <Route
+            path="/shipping-rules"
+            element={
+              <OwnerRoute>
+                <ShippingRules />
+              </OwnerRoute>
+            }
+          />
+          <Route
             path="/reports"
             element={
               <OwnerRoute>
@@ -214,7 +250,7 @@ function AppRoutes() {
               </ProtectedRoute>
             }
           />
-          {["/customers", "/delivery-zones", "/gst-rules", "/shipping-rules", "/coupons", "/notifications", "/staff"].map((path) => (
+          {["/coupons", "/notifications", "/staff"].map((path) => (
             <Route
               key={path}
               path={path}

@@ -21,6 +21,8 @@ import { getCartTotal } from "./queries/cart";
 import { findProductById } from "./queries/products";
 import { findAllInventory } from "./queries/inventory";
 import { generateInvoiceFromOrder } from "./queries/invoices";
+import { calculateGstForOrder } from "./queries/gst";
+import { calculateShippingForOrder } from "./queries/shipping";
 
 function canAccessOrderDetails(input: {
   user: { role: string; email?: string | null; companyId?: number | null };
@@ -96,6 +98,79 @@ export const orderRouter = createRouter({
       return findOrdersByBuyer(companyId, filters);
     }),
 
+  quote: authedQuery
+    .input(
+      z.object({
+        shippingState: z.string().trim().min(2).max(100),
+        shippingMethodId: z.number().int().positive().optional(),
+      }),
+    )
+    .query(async ({ ctx, input }) => {
+      const cart = await getCartTotal(ctx.user.id);
+      if (cart.items.length === 0) {
+        return {
+          subtotal: 0,
+          taxAmount: 0,
+          shippingAmount: 0,
+          totalAmount: 0,
+          deliveryAvailable: false,
+        };
+      }
+
+      let supplierId: number | null = null;
+      const gstItems = [];
+      for (const item of cart.items) {
+        const product = await findProductById(item.productId);
+        if (!product || product.status !== "active") {
+          throw new TRPCError({
+            code: "BAD_REQUEST",
+            message: "A product in your cart is no longer available.",
+          });
+        }
+        if (supplierId === null) supplierId = product.supplierId;
+        if (product.supplierId !== supplierId) {
+          throw new TRPCError({
+            code: "BAD_REQUEST",
+            message: "Orders can only contain products from one supplier.",
+          });
+        }
+        gstItems.push({
+          categoryId: product.categoryId,
+          taxableAmount: Number(item.unitPrice) * item.quantity,
+        });
+      }
+
+      if (!supplierId) {
+        throw new TRPCError({
+          code: "BAD_REQUEST",
+          message: "Cart does not contain valid products.",
+        });
+      }
+
+      const subtotal = cart.total;
+      const gst = await calculateGstForOrder({ companyId: supplierId, items: gstItems });
+      const shipping = await calculateShippingForOrder({
+        companyId: supplierId,
+        subtotal,
+        state: input.shippingState,
+        shippingMethodId: input.shippingMethodId,
+      });
+
+      return {
+        subtotal,
+        taxAmount: gst.taxAmount,
+        shippingAmount: shipping.shippingAmount,
+        totalAmount: subtotal + gst.taxAmount + shipping.shippingAmount,
+        deliveryAvailable: shipping.available,
+        deliveryZoneId: shipping.deliveryZoneId,
+        warehouseId: shipping.warehouseId,
+        shippingMethodId: shipping.shippingMethodId,
+        shippingMethod: shipping.shippingMethod,
+        deliveryEstimate: shipping.deliveryEstimate,
+        gstBreakdown: gst.breakdown,
+      };
+    }),
+
   detail: authedQuery
     .input(z.object({ orderId: z.number() }))
     .query(async ({ ctx, input }) => {
@@ -127,11 +202,18 @@ export const orderRouter = createRouter({
         shippingPostalCode: z.string().optional(),
         shippingCountry: z.string().optional(),
         shippingMethod: z.string().optional(),
+        shippingMethodId: z.number().int().positive().optional(),
         buyerNotes: z.string().optional(),
       })
     )
     .mutation(async ({ ctx, input }) => {
       const buyerId = requireCompanyId(ctx.user.companyId);
+      if (!input.shippingState?.trim()) {
+        throw new TRPCError({
+          code: "BAD_REQUEST",
+          message: "Select a delivery state before placing the order.",
+        });
+      }
 
       const cart = await getCartTotal(ctx.user.id);
       if (cart.items.length === 0) {
@@ -142,6 +224,7 @@ export const orderRouter = createRouter({
       }
 
       const orderItemsData = [];
+      const gstItems = [];
       let supplierId: number | null = null;
       let currency = "INR";
 
@@ -210,6 +293,10 @@ export const orderRouter = createRouter({
           quantityOnHand: inventoryRecord.quantityOnHand,
           reorderLevel: inventoryRecord.reorderLevel,
         });
+        gstItems.push({
+          categoryId: product.categoryId,
+          taxableAmount: totalPrice,
+        });
       }
 
       if (supplierId === null || orderItemsData.length === 0) {
@@ -220,8 +307,24 @@ export const orderRouter = createRouter({
       }
 
       const subtotal = cart.total;
-      const taxAmount = 0;
-      const shippingAmount = 0;
+      const gst = await calculateGstForOrder({
+        companyId: supplierId,
+        items: gstItems,
+      });
+      const taxAmount = gst.taxAmount;
+      const shipping = await calculateShippingForOrder({
+        companyId: supplierId,
+        subtotal,
+        state: input.shippingState,
+        shippingMethodId: input.shippingMethodId,
+      });
+      if (input.shippingState && !shipping.available) {
+        throw new TRPCError({
+          code: "BAD_REQUEST",
+          message: "Delivery is not available for the selected state.",
+        });
+      }
+      const shippingAmount = shipping.shippingAmount;
       const totalAmount = subtotal + taxAmount + shippingAmount;
       const orderNumber = `FF-${Date.now()}-${ctx.user.id}`;
 
@@ -242,7 +345,12 @@ export const orderRouter = createRouter({
           shippingState: input.shippingState,
           shippingPostalCode: input.shippingPostalCode,
           shippingCountry: input.shippingCountry,
-          shippingMethod: input.shippingMethod,
+          shippingMethod: input.shippingMethod ?? shipping.shippingMethod,
+          deliveryEstimate: shipping.deliveryEstimate,
+          warehouseId: shipping.warehouseId,
+          deliveryZoneId: shipping.deliveryZoneId,
+          shippingMethodId: shipping.shippingMethodId,
+          gstConfigId: gst.gstConfigId,
           buyerNotes: input.buyerNotes,
         },
         items: orderItemsData,

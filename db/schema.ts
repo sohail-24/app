@@ -97,6 +97,19 @@ export const warehouseMovementTypeEnum = pgEnum("warehouse_movement_type", [
   "receive",
   "dispatch",
 ]);
+export const customerStatusEnum = pgEnum("customer_status", [
+  "active",
+  "inactive",
+  "blocked",
+]);
+export const gstConfigStatusEnum = pgEnum("gst_config_status", [
+  "active",
+  "inactive",
+]);
+export const shippingMethodStatusEnum = pgEnum("shipping_method_status", [
+  "active",
+  "inactive",
+]);
 export const otpPurposeEnum = pgEnum("purpose", ["login"]);
 
 // ─────────────────────────────────────────────────────────────
@@ -224,6 +237,46 @@ export const companies = pgTable(
 
 export type Company = typeof companies.$inferSelect;
 export type InsertCompany = typeof companies.$inferInsert;
+
+// ─────────────────────────────────────────────────────────────
+// CUSTOMERS — Buyer records managed by supplier owners
+// ─────────────────────────────────────────────────────────────
+export const customers = pgTable(
+  "customers",
+  {
+    id: bigserial("id", { mode: "number" }).primaryKey(),
+    ownerCompanyId: bigint("ownerCompanyId", { mode: "number" }).notNull(),
+    buyerCompanyId: bigint("buyerCompanyId", { mode: "number" }),
+    name: varchar("name", { length: 255 }).notNull(),
+    contactName: varchar("contactName", { length: 255 }),
+    email: varchar("email", { length: 320 }),
+    phone: varchar("phone", { length: 50 }),
+    status: customerStatusEnum("status").default("active").notNull(),
+    addressLine1: varchar("addressLine1", { length: 255 }),
+    addressLine2: varchar("addressLine2", { length: 255 }),
+    city: varchar("city", { length: 100 }),
+    state: varchar("state", { length: 100 }),
+    postalCode: varchar("postalCode", { length: 20 }),
+    country: varchar("country", { length: 100 }).default("India"),
+    taxId: varchar("taxId", { length: 100 }),
+    notes: text("notes"),
+    createdAt: timestamp("createdAt").defaultNow().notNull(),
+    updatedAt: timestamp("updatedAt")
+      .defaultNow()
+      .notNull()
+      .$onUpdate(() => new Date()),
+  },
+  (table) => ({
+    ownerIdx: index("customer_owner_idx").on(table.ownerCompanyId),
+    buyerCompanyIdx: index("customer_buyer_company_idx").on(table.buyerCompanyId),
+    statusIdx: index("customer_status_idx").on(table.status),
+    emailIdx: index("customer_email_idx").on(table.email),
+    phoneIdx: index("customer_phone_idx").on(table.phone),
+  })
+);
+
+export type Customer = typeof customers.$inferSelect;
+export type InsertCustomer = typeof customers.$inferInsert;
 
 // ─────────────────────────────────────────────────────────────
 // CATEGORIES — Product categories for fruits
@@ -401,6 +454,10 @@ export const orders = pgTable(
     deliveryEstimate: deliveryEstimateEnum("deliveryEstimate"),
     estimatedDeliveryDate: timestamp("estimatedDeliveryDate"),
     actualDeliveryDate: timestamp("actualDeliveryDate"),
+    warehouseId: bigint("warehouseId", { mode: "number" }),
+    deliveryZoneId: bigint("deliveryZoneId", { mode: "number" }),
+    shippingMethodId: bigint("shippingMethodId", { mode: "number" }),
+    gstConfigId: bigint("gstConfigId", { mode: "number" }),
     // Dates
     orderedAt: timestamp("orderedAt").defaultNow().notNull(),
     confirmedAt: timestamp("confirmedAt"),
@@ -423,6 +480,10 @@ export const orders = pgTable(
     supplierIdx: index("order_supplier_idx").on(table.supplierId),
     statusIdx: index("order_status_idx").on(table.status),
     deliveryEstimateIdx: index("order_delivery_estimate_idx").on(table.deliveryEstimate),
+    warehouseIdx: index("order_warehouse_idx").on(table.warehouseId),
+    deliveryZoneIdx: index("order_delivery_zone_idx").on(table.deliveryZoneId),
+    shippingMethodIdx: index("order_shipping_method_idx").on(table.shippingMethodId),
+    gstConfigIdx: index("order_gst_config_idx").on(table.gstConfigId),
     paymentStatusIdx: index("order_payment_idx").on(table.paymentStatus),
     orderedAtIdx: index("order_date_idx").on(table.orderedAt),
     placedByIdx: index("order_placed_by_idx").on(table.placedByUserId),
@@ -479,6 +540,10 @@ export const invoices = pgTable(
     customerPhone: varchar("customerPhone", { length: 50 }),
     billingAddress: text("billingAddress"),
     subtotal: numeric("subtotal", { precision: 12, scale: 2 }).notNull(),
+    taxAmount: numeric("taxAmount", { precision: 12, scale: 2 }).default("0.00").notNull(),
+    shippingAmount: numeric("shippingAmount", { precision: 12, scale: 2 }).default("0.00").notNull(),
+    gstRate: numeric("gstRate", { precision: 5, scale: 2 }).default("0.00").notNull(),
+    gstin: varchar("gstin", { length: 20 }),
     totalAmount: numeric("totalAmount", { precision: 12, scale: 2 }).notNull(),
     archivedAt: timestamp("archivedAt"),
     createdAt: timestamp("createdAt").defaultNow().notNull(),
@@ -579,6 +644,13 @@ export const warehouses = pgTable(
     code: varchar("code", { length: 80 }),
     description: text("description"),
     address: text("address").notNull(),
+    city: varchar("city", { length: 100 }),
+    state: varchar("state", { length: 100 }),
+    postalCode: varchar("postalCode", { length: 20 }),
+    country: varchar("country", { length: 100 }).default("India"),
+    capacityUnits: integer("capacityUnits").default(0).notNull(),
+    usedCapacityUnits: integer("usedCapacityUnits").default(0).notNull(),
+    isDefault: boolean("isDefault").default(false).notNull(),
     contactPerson: varchar("contactPerson", { length: 255 }),
     contactNumber: varchar("contactNumber", { length: 50 }),
     status: warehouseStatusEnum("status").default("active").notNull(),
@@ -590,9 +662,10 @@ export const warehouses = pgTable(
       .$onUpdate(() => new Date()),
   },
   (table) => ({
-    companyIdx: uniqueIndex("warehouse_company_idx").on(table.companyId),
+    companyIdx: index("warehouse_company_idx").on(table.companyId),
     codeIdx: uniqueIndex("warehouse_code_idx").on(table.code),
     statusIdx: index("warehouse_status_idx").on(table.status),
+    defaultIdx: index("warehouse_default_idx").on(table.isDefault),
   })
 );
 
@@ -630,3 +703,103 @@ export const warehouseStockMovements = pgTable(
 
 export type WarehouseStockMovement = typeof warehouseStockMovements.$inferSelect;
 export type InsertWarehouseStockMovement = typeof warehouseStockMovements.$inferInsert;
+
+// ─────────────────────────────────────────────────────────────
+// DELIVERY ZONES — Serviceable states per supplier
+// ─────────────────────────────────────────────────────────────
+export const deliveryZones = pgTable(
+  "delivery_zones",
+  {
+    id: bigserial("id", { mode: "number" }).primaryKey(),
+    companyId: bigint("companyId", { mode: "number" }).notNull(),
+    warehouseId: bigint("warehouseId", { mode: "number" }),
+    name: varchar("name", { length: 255 }).notNull(),
+    state: varchar("state", { length: 100 }).notNull(),
+    deliveryEstimate: deliveryEstimateEnum("deliveryEstimate").default("next_day").notNull(),
+    deliveryFee: numeric("deliveryFee", { precision: 12, scale: 2 }).default("0.00").notNull(),
+    minimumOrderAmount: numeric("minimumOrderAmount", { precision: 12, scale: 2 }).default("0.00").notNull(),
+    isActive: boolean("isActive").default(true).notNull(),
+    createdAt: timestamp("createdAt").defaultNow().notNull(),
+    updatedAt: timestamp("updatedAt")
+      .defaultNow()
+      .notNull()
+      .$onUpdate(() => new Date()),
+  },
+  (table) => ({
+    companyIdx: index("delivery_zone_company_idx").on(table.companyId),
+    warehouseIdx: index("delivery_zone_warehouse_idx").on(table.warehouseId),
+    stateIdx: index("delivery_zone_state_idx").on(table.state),
+    activeIdx: index("delivery_zone_active_idx").on(table.isActive),
+  })
+);
+
+export type DeliveryZone = typeof deliveryZones.$inferSelect;
+export type InsertDeliveryZone = typeof deliveryZones.$inferInsert;
+
+// ─────────────────────────────────────────────────────────────
+// GST CONFIGURATION — Supplier tax settings for orders and invoices
+// ─────────────────────────────────────────────────────────────
+export const gstConfigurations = pgTable(
+  "gst_configurations",
+  {
+    id: bigserial("id", { mode: "number" }).primaryKey(),
+    companyId: bigint("companyId", { mode: "number" }).notNull(),
+    categoryId: bigint("categoryId", { mode: "number" }).notNull(),
+    name: varchar("name", { length: 255 }).notNull(),
+    gstin: varchar("gstin", { length: 20 }),
+    hsnCode: varchar("hsnCode", { length: 20 }),
+    rate: numeric("rate", { precision: 5, scale: 2 }).notNull(),
+    status: gstConfigStatusEnum("status").default("active").notNull(),
+    isDefault: boolean("isDefault").default(false).notNull(),
+    createdAt: timestamp("createdAt").defaultNow().notNull(),
+    updatedAt: timestamp("updatedAt")
+      .defaultNow()
+      .notNull()
+      .$onUpdate(() => new Date()),
+  },
+  (table) => ({
+    companyIdx: index("gst_config_company_idx").on(table.companyId),
+    categoryIdx: index("gst_config_category_idx").on(table.categoryId),
+    statusIdx: index("gst_config_status_idx").on(table.status),
+    defaultIdx: index("gst_config_default_idx").on(table.isDefault),
+  })
+);
+
+export type GstConfiguration = typeof gstConfigurations.$inferSelect;
+export type InsertGstConfiguration = typeof gstConfigurations.$inferInsert;
+
+// ─────────────────────────────────────────────────────────────
+// SHIPPING METHODS — Zone-aware charges and delivery estimates
+// ─────────────────────────────────────────────────────────────
+export const shippingMethods = pgTable(
+  "shipping_methods",
+  {
+    id: bigserial("id", { mode: "number" }).primaryKey(),
+    companyId: bigint("companyId", { mode: "number" }).notNull(),
+    warehouseId: bigint("warehouseId", { mode: "number" }),
+    deliveryZoneId: bigint("deliveryZoneId", { mode: "number" }),
+    name: varchar("name", { length: 255 }).notNull(),
+    code: varchar("code", { length: 80 }),
+    description: text("description"),
+    charge: numeric("charge", { precision: 12, scale: 2 }).default("0.00").notNull(),
+    freeShippingThreshold: numeric("freeShippingThreshold", { precision: 12, scale: 2 }),
+    deliveryEstimate: deliveryEstimateEnum("deliveryEstimate").default("next_day").notNull(),
+    status: shippingMethodStatusEnum("status").default("active").notNull(),
+    isDefault: boolean("isDefault").default(false).notNull(),
+    createdAt: timestamp("createdAt").defaultNow().notNull(),
+    updatedAt: timestamp("updatedAt")
+      .defaultNow()
+      .notNull()
+      .$onUpdate(() => new Date()),
+  },
+  (table) => ({
+    companyIdx: index("shipping_method_company_idx").on(table.companyId),
+    warehouseIdx: index("shipping_method_warehouse_idx").on(table.warehouseId),
+    deliveryZoneIdx: index("shipping_method_delivery_zone_idx").on(table.deliveryZoneId),
+    statusIdx: index("shipping_method_status_idx").on(table.status),
+    defaultIdx: index("shipping_method_default_idx").on(table.isDefault),
+  })
+);
+
+export type ShippingMethod = typeof shippingMethods.$inferSelect;
+export type InsertShippingMethod = typeof shippingMethods.$inferInsert;

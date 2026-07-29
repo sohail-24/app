@@ -15,6 +15,7 @@ export async function findCartByUserId(userId: number) {
       createdAt: cartItems.createdAt,
       updatedAt: cartItems.updatedAt,
       productName: products.name,
+      productCategoryId: products.categoryId,
       productSlug: products.slug,
       productImage: products.image,
       productUnitType: products.unitType,

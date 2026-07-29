@@ -12,11 +12,12 @@ import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Separator } from "@/components/ui/separator";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { clearGuestCart, getGuestCart } from "@/lib/guestCart";
+import { isOwner } from "@/lib/roles";
 
 export default function Login() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
-  const returnTo = useMemo(() => searchParams.get("returnTo") || "/dashboard", [searchParams]);
+  const requestedReturnTo = useMemo(() => searchParams.get("returnTo"), [searchParams]);
   const utils = trpc.useUtils();
   const addToCart = trpc.cart.add.useMutation();
   const loginMobile = trpc.auth.loginMobile.useMutation();
@@ -49,21 +50,22 @@ export default function Login() {
     clearGuestCart();
   }
 
-  async function finishLogin() {
+  async function finishLogin(user?: { role?: string | null; email?: string | null }) {
     await syncGuestCart();
     await utils.invalidate();
-    navigate(returnTo, { replace: true });
+    const defaultDestination = user?.role === "admin" || isOwner(user) ? "/dashboard" : "/";
+    navigate(requestedReturnTo || defaultDestination, { replace: true });
   }
 
   async function handleMobileLogin(event: FormEvent) {
     event.preventDefault();
     setError(null);
     try {
-      await loginMobile.mutateAsync({
+      const result = await loginMobile.mutateAsync({
         mobileNumber: mobileForm.mobileNumber,
         password: mobileForm.password,
       });
-      await finishLogin();
+      await finishLogin(result.user);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Unable to sign in.");
     }
@@ -73,11 +75,11 @@ export default function Login() {
     event.preventDefault();
     setError(null);
     try {
-      await loginEmail.mutateAsync({
+      const result = await loginEmail.mutateAsync({
         email: emailForm.email,
         password: emailForm.password,
       });
-      await finishLogin();
+      await finishLogin(result.user);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Unable to sign in.");
     }
@@ -98,13 +100,13 @@ export default function Login() {
     }
 
     try {
-      await register.mutateAsync({
+      const result = await register.mutateAsync({
         method: registrationMethod,
         mobileNumber: registrationMethod === "mobile" ? registerForm.mobileNumber : undefined,
         email: registrationMethod === "email" ? registerForm.email : undefined,
         password: registerForm.password,
       });
-      await finishLogin();
+      await finishLogin(result.user);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Unable to create account.");
     }

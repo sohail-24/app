@@ -1,5 +1,6 @@
 import { getDb } from "./connection";
 import {
+  gstConfigurations,
   invoiceItems,
   invoices,
   orders,
@@ -163,6 +164,11 @@ export async function generateInvoiceFromOrder(orderId: number) {
   }
 
   const invoiceNumber = await nextInvoiceNumber();
+  const gstConfig = order.gstConfigId
+    ? await db.query.gstConfigurations.findFirst({
+        where: eq(gstConfigurations.id, order.gstConfigId),
+      })
+    : null;
   const invoiceData: InsertInvoice = {
     companyId: order.supplierId,
     orderId: order.id,
@@ -176,6 +182,10 @@ export async function generateInvoiceFromOrder(orderId: number) {
     customerPhone: order.buyer.phone,
     billingAddress: formatOrderBillingAddress(order),
     subtotal: order.subtotal,
+    taxAmount: order.taxAmount ?? "0.00",
+    shippingAmount: order.shippingAmount ?? "0.00",
+    gstRate: gstConfig?.rate ?? "0.00",
+    gstin: gstConfig?.gstin,
     totalAmount: order.totalAmount,
   };
 

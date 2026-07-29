@@ -50,7 +50,14 @@ export default function Checkout() {
   const cities = useMemo(() => citiesByState[form.state] ?? [], [form.state]);
   const items = cartQuery.data?.items ?? [];
   const subtotal = cartQuery.data?.total ?? 0;
-  const total = subtotal;
+  const quoteQuery = trpc.order.quote.useQuery(
+    { shippingState: form.state },
+    { enabled: items.length > 0 && !!form.state, retry: false },
+  );
+  const shippingAmount = quoteQuery.data?.shippingAmount ?? 0;
+  const taxAmount = quoteQuery.data?.taxAmount ?? 0;
+  const total = quoteQuery.data?.totalAmount ?? subtotal + shippingAmount + taxAmount;
+  const deliveryUnavailable = quoteQuery.data ? !quoteQuery.data.deliveryAvailable : false;
 
   if (cartQuery.isLoading) {
     return <div className="py-16 text-center"><Loader2 className="mx-auto h-8 w-8 animate-spin text-emerald-600" /></div>;
@@ -72,7 +79,6 @@ export default function Checkout() {
       shippingAddressLine1: form.address,
       shippingCity: form.city,
       shippingState: form.state,
-      shippingPostalCode: "000000",
       shippingCountry: "IND",
       shippingMethod: form.slot || undefined,
       buyerNotes: form.notes || undefined,
@@ -146,7 +152,7 @@ export default function Checkout() {
               <Checkbox checked={form.agreeTerms} onCheckedChange={(checked) => setForm({ ...form, agreeTerms: checked === true })} />
               I agree to the Terms & Conditions.
             </Label>
-            <Button type="submit" className="h-11 w-full bg-emerald-600 hover:bg-emerald-700" disabled={createOrder.isPending || !form.confirmAddress || !form.agreeTerms}>
+            <Button type="submit" className="h-11 w-full bg-emerald-600 hover:bg-emerald-700" disabled={createOrder.isPending || quoteQuery.isLoading || deliveryUnavailable || !form.confirmAddress || !form.agreeTerms}>
               {createOrder.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
               Place Order
             </Button>
@@ -169,8 +175,16 @@ export default function Checkout() {
             </div>
             <Separator />
             <SummaryRow label="Subtotal" value={formatCurrency(subtotal)} />
-            <SummaryRow label="Shipping" value={formatCurrency(0)} muted />
-            <SummaryRow label="GST" value={formatCurrency(0)} muted />
+            <SummaryRow label="Shipping" value={quoteQuery.isLoading ? "Calculating..." : formatCurrency(shippingAmount)} muted />
+            <SummaryRow label="GST" value={quoteQuery.isLoading ? "Calculating..." : formatCurrency(taxAmount)} muted />
+            {quoteQuery.data?.deliveryEstimate && (
+              <SummaryRow label="Estimate" value={quoteQuery.data.deliveryEstimate.replaceAll("_", " ")} muted />
+            )}
+            {deliveryUnavailable && (
+              <div className="rounded-md border border-destructive/30 bg-destructive/5 p-3 text-sm text-destructive">
+                Delivery is not available for the selected state.
+              </div>
+            )}
             <Separator />
             <SummaryRow label="Total" value={formatCurrency(total)} strong />
           </CardContent>
