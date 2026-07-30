@@ -61,6 +61,9 @@ const statusConfig: Record<string, { label: string; className: string }> = {
 type InventoryStatusFilter = "all" | "in_stock" | "low_stock" | "out_of_stock";
 
 type InventoryItem = {
+  unitPrice?: string | null;
+  compareAtPrice?: string | null;
+  tags?: string | null;
   id: number;
   productId: number;
   productName: string | null;
@@ -81,6 +84,9 @@ type InventoryItem = {
 };
 
 type InventoryForm = {
+  sellingPrice: string;
+  purchasePrice: string;
+  wholesalePrice: string;
   supplierId: string;
   quantityOnHand: string;
   quantityReserved: string;
@@ -169,7 +175,20 @@ export default function Inventory() {
 
   useEffect(() => {
     if (!selected) return;
+
+    let tagsObj: Record<string, unknown> = {};
+    try {
+      if (selected.tags && typeof selected.tags === 'string' && selected.tags.startsWith('{')) {
+        tagsObj = JSON.parse(selected.tags) as Record<string, unknown>;
+      }
+    } catch {
+      // ignore
+    }
+
     setForm({
+      sellingPrice: selected.unitPrice ? String(selected.unitPrice) : "",
+      purchasePrice: selected.compareAtPrice ? String(selected.compareAtPrice) : "",
+      wholesalePrice: tagsObj.wholesalePrice ? String(tagsObj.wholesalePrice) : "",
       supplierId: String(selected.supplierId),
       quantityOnHand: String(selected.quantityOnHand),
       quantityReserved: String(selected.quantityReserved),
@@ -192,6 +211,9 @@ export default function Inventory() {
     updateInventory.mutate({
       id: selected.id,
       data: {
+        sellingPrice: form.sellingPrice ? Number(form.sellingPrice) : undefined,
+        purchasePrice: form.purchasePrice ? Number(form.purchasePrice) : undefined,
+        wholesalePrice: form.wholesalePrice ? Number(form.wholesalePrice) : undefined,
         supplierId: Number(form.supplierId),
         quantityOnHand: wholeNumber(form.quantityOnHand),
         quantityReserved: wholeNumber(form.quantityReserved),
@@ -574,6 +596,15 @@ function InventoryManager({
           <InventoryField label="Reorder Qty">
             <Input type="number" min="0" value={form.reorderQuantity} onChange={(event) => onFormChange("reorderQuantity", event.target.value)} />
           </InventoryField>
+          <InventoryField label="Selling Price">
+            <Input type="number" min="0" step="0.01" value={form.sellingPrice} onChange={(event) => onFormChange("sellingPrice", event.target.value)} />
+          </InventoryField>
+          <InventoryField label="Purchase Price">
+            <Input type="number" min="0" step="0.01" value={form.purchasePrice} onChange={(event) => onFormChange("purchasePrice", event.target.value)} />
+          </InventoryField>
+          <InventoryField label="Wholesale Price">
+            <Input type="number" min="0" step="0.01" value={form.wholesalePrice} onChange={(event) => onFormChange("wholesalePrice", event.target.value)} />
+          </InventoryField>
           <InventoryField label="Supplier">
             <Select value={form.supplierId} onValueChange={(value) => onFormChange("supplierId", value)}>
               <SelectTrigger><SelectValue placeholder="Supplier" /></SelectTrigger>
@@ -753,6 +784,9 @@ function wholeNumber(value: string) {
 
 function emptyInventoryForm(): InventoryForm {
   return {
+    sellingPrice: "",
+    purchasePrice: "",
+    wholesalePrice: "",
     supplierId: "",
     quantityOnHand: "0",
     quantityReserved: "0",

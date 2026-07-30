@@ -51,6 +51,9 @@ export async function findAllInventory(filters?: {
       productName: products.name,
       productSlug: products.slug,
       productImage: products.image,
+      unitPrice: products.unitPrice,
+      compareAtPrice: products.compareAtPrice,
+      tags: products.tags,
       supplierName: companies.name,
     })
     .from(inventory)
@@ -99,11 +102,20 @@ export async function updateInventory(
     lastCountedAt: Date;
     notes: string;
     status: "in_stock" | "low_stock" | "out_of_stock";
-  }>
+  }>,
+  pricing?: {
+    unitPrice?: number;
+    compareAtPrice?: number;
+    wholesalePrice?: number;
+  }
 ) {
   const db = getDb();
-  const updates = withoutUndefined({ ...data, updatedAt: new Date() });
-  if (Object.keys(updates).length === 0) return;
+  const dataUpdates = withoutUndefined(data);
+  const hasData = Object.keys(dataUpdates).length > 0;
+
+  if (!hasData && !pricing) return;
+
+  const updates = { ...dataUpdates, updatedAt: new Date() };
 
   await db.transaction(async (tx) => {
     const [existing] = await tx
@@ -112,13 +124,50 @@ export async function updateInventory(
       .where(eq(inventory.id, id))
       .limit(1);
 
-    await tx.update(inventory).set(updates).where(eq(inventory.id, id));
+    if (hasData) {
+      await tx.update(inventory).set(updates).where(eq(inventory.id, id));
+    }
 
-    if (data.supplierId !== undefined && existing) {
-      await tx
-        .update(products)
-        .set({ supplierId: data.supplierId, updatedAt: new Date() })
-        .where(eq(products.id, existing.productId));
+    if (existing) {
+      const pUpdates: any = {};
+      if (data.supplierId !== undefined) {
+        pUpdates.supplierId = data.supplierId;
+      }
+      if (pricing?.unitPrice !== undefined) {
+        pUpdates.unitPrice = pricing.unitPrice.toFixed(2);
+      }
+      if (pricing?.compareAtPrice !== undefined) {
+        pUpdates.compareAtPrice = pricing.compareAtPrice.toFixed(2);
+      }
+
+      if (pricing?.wholesalePrice !== undefined) {
+        const [prod] = await tx
+          .select({ tags: products.tags })
+          .from(products)
+          .where(eq(products.id, existing.productId))
+          .limit(1);
+
+        if (prod) {
+          let meta: any = {};
+          try {
+            if (prod.tags && prod.tags.startsWith("{")) {
+              meta = JSON.parse(prod.tags);
+            } else if (prod.tags) {
+              meta = { tags: prod.tags.split(",").map(t => t.trim()).filter(Boolean) };
+            }
+          } catch (e) {}
+          meta.wholesalePrice = pricing.wholesalePrice;
+          pUpdates.tags = JSON.stringify(meta);
+        }
+      }
+
+      if (Object.keys(pUpdates).length > 0) {
+        pUpdates.updatedAt = new Date();
+        await tx
+          .update(products)
+          .set(pUpdates)
+          .where(eq(products.id, existing.productId));
+      }
     }
   });
 }

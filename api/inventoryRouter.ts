@@ -104,6 +104,9 @@ export const inventoryRouter = createRouter({
         id: z.number(),
         data: z.object({
           supplierId: z.number().int().positive().optional(),
+          sellingPrice: z.number().positive().optional(),
+          purchasePrice: z.number().positive().optional(),
+          wholesalePrice: z.number().positive().optional(),
           quantityOnHand: z.number().int().min(0).optional(),
           quantityReserved: z.number().int().min(0).optional(),
           quantityAvailable: z.number().int().min(0).optional(),
@@ -158,7 +161,12 @@ export const inventoryRouter = createRouter({
         status: calculateInventoryStatus(quantityAvailable, reorderLevel),
       };
 
-      await updateInventory(input.id, updateData);
+      const pricing = {
+        unitPrice: input.data.sellingPrice,
+        compareAtPrice: input.data.purchasePrice,
+        wholesalePrice: input.data.wholesalePrice,
+      };
+      await updateInventory(input.id, updateData, pricing);
       return { success: true };
     }),
 
