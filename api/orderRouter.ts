@@ -23,6 +23,8 @@ import { findAllInventory } from "./queries/inventory";
 import { generateInvoiceFromOrder } from "./queries/invoices";
 import { calculateGstForOrder } from "./queries/gst";
 import { calculateShippingForOrder } from "./queries/shipping";
+import { BUSINESS_OWNER_EMAIL } from "@contracts/roles";
+import { findUserByEmail } from "./queries/users";
 
 function canAccessOrderDetails(input: {
   user: { role: string; email?: string | null; companyId?: number | null };
@@ -149,8 +151,18 @@ export const orderRouter = createRouter({
 
       const subtotal = cart.total;
       const gst = await calculateGstForOrder({ companyId: supplierId, items: gstItems });
+
+      const ownerUser = await findUserByEmail(BUSINESS_OWNER_EMAIL);
+      const platformCompanyId = ownerUser?.companyId;
+      if (!platformCompanyId) {
+        throw new TRPCError({
+          code: "INTERNAL_SERVER_ERROR",
+          message: "Platform owner company not configured.",
+        });
+      }
+
       const shipping = await calculateShippingForOrder({
-        companyId: supplierId,
+        companyId: platformCompanyId,
         subtotal,
         state: input.shippingState,
         shippingMethodId: input.shippingMethodId,
@@ -312,8 +324,18 @@ export const orderRouter = createRouter({
         items: gstItems,
       });
       const taxAmount = gst.taxAmount;
+
+      const ownerUser = await findUserByEmail(BUSINESS_OWNER_EMAIL);
+      const platformCompanyId = ownerUser?.companyId;
+      if (!platformCompanyId) {
+        throw new TRPCError({
+          code: "INTERNAL_SERVER_ERROR",
+          message: "Platform owner company not configured.",
+        });
+      }
+
       const shipping = await calculateShippingForOrder({
-        companyId: supplierId,
+        companyId: platformCompanyId,
         subtotal,
         state: input.shippingState,
         shippingMethodId: input.shippingMethodId,
