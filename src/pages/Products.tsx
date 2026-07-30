@@ -243,11 +243,12 @@ function ProductCard({ product, onAdd, pending }: { product: CatalogProduct; onA
   const moq = product.minimumOrderQuantity ?? 1;
   const unit = product.unitType ?? "kg";
   const [quantity, setQuantity] = useState(moq);
+  const [imageFailed, setImageFailed] = useState(false);
 
   return (
     <Card className="overflow-hidden shadow-sm">
       <div className="flex aspect-[4/3] items-center justify-center bg-muted text-lg font-semibold text-muted-foreground">
-        {product.image ? <img src={product.image} alt={product.name} className="h-full w-full object-cover" /> : <ImageIcon className="h-9 w-9" />}
+        {product.image && !imageFailed ? <img src={product.image} alt={product.name} className="h-full w-full object-cover" onError={() => setImageFailed(true)} /> : <ImageIcon className="h-9 w-9" />}
       </div>
       <CardContent className="space-y-3 p-4 text-sm">
         <div>
