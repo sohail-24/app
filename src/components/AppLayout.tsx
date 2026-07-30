@@ -209,7 +209,7 @@ function AppLayoutContent() {
     <>
       <Sidebar collapsible="icon" className="z-40 border-sidebar-border">
         <SidebarHeader className="h-16 border-b border-sidebar-border px-3">
-          <Link to="/dashboard" className="flex min-w-0 items-center gap-3 rounded-md px-1 py-1.5">
+          <Link to={role === "buyer" ? "/" : "/dashboard"} className="flex min-w-0 items-center gap-3 rounded-md px-1 py-1.5">
             <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-sidebar-primary text-sidebar-primary-foreground shadow-sm">
               <Boxes className="h-5 w-5" />
             </div>
