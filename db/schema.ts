@@ -610,6 +610,7 @@ export const inventory = pgTable(
     status: inventoryStatusEnum("status")
       .default("in_stock")
       .notNull(),
+    isActive: boolean("isActive").default(true).notNull(),
     notes: text("notes"),
     createdAt: timestamp("createdAt").defaultNow().notNull(),
     updatedAt: timestamp("updatedAt")

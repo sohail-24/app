@@ -28,6 +28,14 @@ export async function validateInventory(
     });
   }
 
+  if (!inventoryRecord.isActive) {
+    throw new TRPCError({
+      code: "BAD_REQUEST",
+      message: `${productName} is currently inactive.`,
+    });
+  }
+
+
   if (inventoryRecord.quantityAvailable < requiredQuantity) {
     throw new TRPCError({
       code: "BAD_REQUEST",
@@ -75,6 +83,7 @@ export async function findAllInventory(filters?: {
       receivedDate: inventory.receivedDate,
       lastCountedAt: inventory.lastCountedAt,
       status: inventory.status,
+      isActive: inventory.isActive,
       notes: inventory.notes,
       createdAt: inventory.createdAt,
       updatedAt: inventory.updatedAt,
@@ -132,6 +141,7 @@ export async function updateInventory(
     lastCountedAt: Date;
     notes: string;
     status: "in_stock" | "low_stock" | "out_of_stock";
+    isActive: boolean;
   }>,
   pricing?: {
     unitPrice?: number;
