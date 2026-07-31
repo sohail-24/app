@@ -215,6 +215,7 @@ export default function Inventory() {
     updateInventory.mutate({
       id: selected.id,
       data: {
+        isActive: form.isActive,
         sellingPrice: form.sellingPrice ? Number(form.sellingPrice) : undefined,
         purchasePrice: form.purchasePrice ? Number(form.purchasePrice) : undefined,
         wholesalePrice: form.wholesalePrice ? Number(form.wholesalePrice) : undefined,
