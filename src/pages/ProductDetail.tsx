@@ -29,6 +29,8 @@ export default function ProductDetail() {
   });
   const product = data;
   const minQty = product?.minimumOrderQuantity ?? 1;
+  const stock = product?.stock ?? 0;
+  const isOutOfStock = stock < minQty;
   const price = toNumber(product?.unitPrice);
   const compareAt = toNumber(product?.compareAtPrice);
   const unit = product?.unitType ?? "kg";
@@ -68,6 +70,10 @@ export default function ProductDetail() {
   const currentProduct = product;
 
   function addProduct(destination?: string) {
+    if (quantity > stock) {
+      toast.error("Requested quantity exceeds available stock.");
+      return;
+    }
     if (user && data) {
       addToCart.mutate({ productId: data.id, quantity }, { onSuccess: () => destination && navigate(destination) });
       return;
@@ -136,28 +142,34 @@ export default function ProductDetail() {
           <div className="space-y-2">
             <p className="text-sm font-medium">Quantity</p>
             <div className="flex items-center gap-3">
-              <Button variant="outline" size="icon" onClick={() => setQuantity(Math.max(minQty, quantity - 1))} disabled={quantity <= minQty}>
+              <Button variant="outline" size="icon" onClick={() => setQuantity(Math.max(minQty, quantity - 1))} disabled={quantity <= minQty || isOutOfStock}>
                 <Minus className="h-4 w-4" />
               </Button>
               <span className="min-w-20 text-center font-medium">{quantity} {unit}</span>
-              <Button variant="outline" size="icon" onClick={() => setQuantity(quantity + 1)}>
+              <Button variant="outline" size="icon" onClick={() => {
+                if (quantity >= stock) {
+                  toast.error(`Only ${stock} available.`);
+                } else {
+                  setQuantity(quantity + 1);
+                }
+              }} disabled={isOutOfStock}>
                 <Plus className="h-4 w-4" />
               </Button>
             </div>
           </div>
           <p className="text-lg font-semibold">Total : {formatCurrency(price * quantity)}</p>
           <div className="grid gap-3 md:grid-cols-2">
-            <Button variant="outline" className="h-12" onClick={() => addProduct()}>
+            <Button variant="outline" className="h-12" onClick={() => addProduct()} disabled={isOutOfStock}>
               <ShoppingCart className="mr-2 h-4 w-4" />
-              Add & Continue Shopping
+              {isOutOfStock ? "Out of Stock" : "Add & Continue Shopping"}
             </Button>
-            <Button className="h-12 bg-emerald-600 hover:bg-emerald-700" onClick={() => addProduct("/checkout")}>
+            <Button className="h-12 bg-emerald-600 hover:bg-emerald-700" onClick={() => addProduct("/checkout")} disabled={isOutOfStock}>
               <Zap className="mr-2 h-4 w-4" />
-              Buy Now
+              {isOutOfStock ? "Out of Stock" : "Buy Now"}
             </Button>
-            <Button className="h-12 md:col-span-2" onClick={() => addProduct("/cart")} disabled={addToCart.isPending}>
+            <Button className="h-12 md:col-span-2" onClick={() => addProduct("/cart")} disabled={addToCart.isPending || isOutOfStock}>
               <Check className="mr-2 h-4 w-4" />
-              Add to Cart & Go to Cart
+              {isOutOfStock ? "Out of Stock" : "Add to Cart & Go to Cart"}
             </Button>
           </div>
         </div>

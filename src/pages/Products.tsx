@@ -84,8 +84,12 @@ function BuyerMarketplace() {
   const products = (productsQuery.data ?? []) as CatalogProduct[];
   const activeCategories = categoriesQuery.data ?? [];
 
-  function addProductToCart(product: CatalogProduct) {
-    const quantity = product.minimumOrderQuantity ?? 1;
+  function addProductToCart(product: CatalogProduct, quantity: number) {
+    if (quantity > (product.stock ?? 0)) {
+      toast.error("Requested quantity exceeds available stock.");
+      return;
+    }
+
     if (user) {
       addToCart.mutate({ productId: product.id, quantity });
       return;
@@ -216,7 +220,7 @@ function BuyerMarketplace() {
           ) : (
             <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
               {products.map((product) => (
-                <ProductCard key={product.id} product={product} onAdd={() => addProductToCart(product)} pending={addToCart.isPending} />
+                <ProductCard key={product.id} product={product} onAdd={(quantity) => addProductToCart(product, quantity)} pending={addToCart.isPending} />
               ))}
             </div>
           )}
@@ -238,10 +242,12 @@ function BuyerMarketplace() {
   );
 }
 
-function ProductCard({ product, onAdd, pending }: { product: CatalogProduct; onAdd: () => void; pending?: boolean }) {
+function ProductCard({ product, onAdd, pending }: { product: CatalogProduct; onAdd: (quantity: number) => void; pending?: boolean }) {
   const price = toNumber(product.unitPrice);
   const moq = product.minimumOrderQuantity ?? 1;
   const unit = product.unitType ?? "kg";
+  const stock = product.stock ?? 0;
+  const isOutOfStock = stock < moq;
   const [quantity, setQuantity] = useState(moq);
   const [imageFailed, setImageFailed] = useState(false);
 
@@ -262,18 +268,26 @@ function ProductCard({ product, onAdd, pending }: { product: CatalogProduct; onA
           {product.rating && <p>Rating {product.rating}</p>}
         </div>
         <div className="flex items-center justify-between rounded-md border p-2">
-          <Button variant="outline" size="icon" className="h-7 w-7" onClick={() => setQuantity(Math.max(moq, quantity - 1))}>
+          <Button variant="outline" size="icon" className="h-7 w-7" onClick={() => setQuantity(Math.max(moq, quantity - 1))} disabled={quantity <= moq || isOutOfStock}>
             <Minus className="h-3 w-3" />
           </Button>
           <span>{quantity}{unit}</span>
-          <Button variant="outline" size="icon" className="h-7 w-7" onClick={() => setQuantity(quantity + 1)}>
+          <Button variant="outline" size="icon" className="h-7 w-7" onClick={() => {
+            if (quantity >= stock) {
+              toast.error(`Only ${stock} available.`);
+            } else {
+              setQuantity(quantity + 1);
+            }
+          }} disabled={isOutOfStock}>
             <Plus className="h-3 w-3" />
           </Button>
         </div>
         <p className="font-semibold">Total {formatCurrency(price * quantity)}</p>
         <div className="grid gap-2">
           <Link to={`/products/${product.slug}`}><Button variant="outline" className="w-full"><Eye className="mr-2 h-4 w-4" />View Details</Button></Link>
-          <Button onClick={onAdd} disabled={pending} className="w-full bg-emerald-600 hover:bg-emerald-700">Add to Cart</Button>
+          <Button onClick={() => onAdd(quantity)} disabled={pending || isOutOfStock} className="w-full bg-emerald-600 hover:bg-emerald-700">
+            {isOutOfStock ? "Out of Stock" : "Add to Cart"}
+          </Button>
         </div>
       </CardContent>
     </Card>
