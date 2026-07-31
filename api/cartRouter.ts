@@ -7,8 +7,10 @@ import {
   removeFromCart,
   clearCart,
   getCartTotal,
+  findCartByUserId,
 } from "./queries/cart";
 import { findProductById } from "./queries/products";
+import { validateInventory } from "./queries/inventory";
 
 export const cartRouter = createRouter({
   list: authedQuery.query(async ({ ctx }) => {
@@ -44,6 +46,17 @@ export const cartRouter = createRouter({
         });
       }
 
+      const cartItems = await findCartByUserId(ctx.user.id);
+      const existingCartItem = cartItems.find((item) => item.productId === input.productId);
+      const totalQuantity = (existingCartItem?.quantity ?? 0) + input.quantity;
+
+      await validateInventory(
+        product.id,
+        product.supplierId,
+        product.name,
+        totalQuantity
+      );
+
       return addToCart({
         userId: ctx.user.id,
         productId: input.productId,
@@ -62,6 +75,23 @@ export const cartRouter = createRouter({
       })
     )
     .mutation(async ({ ctx, input }) => {
+      if (input.quantity !== undefined) {
+        const cartItems = await findCartByUserId(ctx.user.id);
+        const existingCartItem = cartItems.find((item) => item.id === input.cartItemId);
+
+        if (existingCartItem) {
+          const product = await findProductById(existingCartItem.productId);
+          if (product) {
+            await validateInventory(
+              product.id,
+              product.supplierId,
+              product.name,
+              input.quantity
+            );
+          }
+        }
+      }
+
       await updateCartItem(
         input.cartItemId,
         ctx.user.id,

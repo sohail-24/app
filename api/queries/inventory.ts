@@ -8,6 +8,36 @@ function withoutUndefined<T extends Record<string, unknown>>(data: T) {
   ) as Partial<T>;
 }
 
+import { TRPCError } from "@trpc/server";
+
+export async function validateInventory(
+  productId: number,
+  supplierId: number,
+  productName: string,
+  requiredQuantity: number
+) {
+  const [inventoryRecord] = await findAllInventory({
+    supplierId,
+    productId,
+  });
+
+  if (!inventoryRecord) {
+    throw new TRPCError({
+      code: "BAD_REQUEST",
+      message: `${productName} does not have inventory available.`,
+    });
+  }
+
+  if (inventoryRecord.quantityAvailable < requiredQuantity) {
+    throw new TRPCError({
+      code: "BAD_REQUEST",
+      message: `Insufficient inventory for ${productName}.`,
+    });
+  }
+
+  return inventoryRecord;
+}
+
 export async function findAllInventory(filters?: {
   supplierId?: number;
   status?: string;
