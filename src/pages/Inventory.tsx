@@ -16,6 +16,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Switch } from "@/components/ui/switch";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Textarea } from "@/components/ui/textarea";
 import {
@@ -80,10 +81,12 @@ type InventoryItem = {
   reorderLevel: number;
   reorderQuantity: number;
   status: string;
+  isActive?: boolean;
   notes: string | null;
 };
 
 type InventoryForm = {
+  isActive: boolean;
   sellingPrice: string;
   purchasePrice: string;
   wholesalePrice: string;
@@ -186,6 +189,7 @@ export default function Inventory() {
     }
 
     setForm({
+      isActive: selected.isActive ?? true,
       sellingPrice: selected.unitPrice ? String(selected.unitPrice) : "",
       purchasePrice: selected.compareAtPrice ? String(selected.compareAtPrice) : "",
       wholesalePrice: tagsObj.wholesalePrice ? String(tagsObj.wholesalePrice) : "",
@@ -515,7 +519,7 @@ function InventoryTable({
                 <TableCell className="font-medium">{formatNumber(item.quantityAvailable)}</TableCell>
                 <TableCell>{formatNumber(item.reorderLevel)}</TableCell>
                 <TableCell>
-                  <InventoryStatus status={item.status} />
+                  <InventoryStatus status={item.status} isActive={item.isActive} />
                 </TableCell>
                 <TableCell className="pr-4">{formatDate(item.lastCountedAt ?? item.updatedAt)}</TableCell>
                 {onSelect && (
@@ -552,7 +556,7 @@ function InventoryManager({
   suppliers: Array<{ id: number; name: string }>;
   saving: boolean;
   actionPending: boolean;
-  onFormChange: (field: keyof InventoryForm, value: string) => void;
+  onFormChange: (field: keyof InventoryForm, value: any) => void;
   onActionChange: (field: keyof ActionForm, value: string) => void;
   onSave: () => void;
   onAction: (action: "in" | "out" | "adjust-add" | "adjust-remove" | "transfer") => void;
@@ -580,6 +584,10 @@ function InventoryManager({
         </p>
       </CardHeader>
       <CardContent className="space-y-5">
+        <div className="flex items-center space-x-2">
+          <Switch checked={form.isActive} onCheckedChange={(checked: boolean) => onFormChange("isActive", checked)} id="is-active" />
+          <Label htmlFor="is-active">Active Inventory</Label>
+        </div>
         <div className="grid gap-3 sm:grid-cols-2">
           <InventoryField label="On Hand">
             <Input type="number" min="0" value={form.quantityOnHand} onChange={(event) => onFormChange("quantityOnHand", event.target.value)} />
@@ -723,7 +731,7 @@ function MovementPanel({
                     <p className="truncate text-sm font-medium">{item.productName ?? `Product #${item.productId}`}</p>
                     <p className="mt-1 text-xs text-muted-foreground">{item.warehouseLocation ?? "Unassigned warehouse"}</p>
                   </div>
-                  <InventoryStatus status={item.status} />
+                  <InventoryStatus status={item.status} isActive={item.isActive} />
                 </div>
                 <div className="mt-4 grid grid-cols-3 gap-2 text-sm">
                   <Mini label="On hand" value={formatNumber(item.quantityOnHand)} />
@@ -754,7 +762,8 @@ function MovementPanel({
   );
 }
 
-function InventoryStatus({ status }: { status: string }) {
+function InventoryStatus({ status, isActive = true }: { status: string; isActive?: boolean }) {
+  if (!isActive) return <Badge className="rounded-md bg-muted text-muted-foreground border-transparent">Inactive</Badge>;
   const config = statusConfig[status] ?? statusConfig.in_stock;
   return <Badge className={`rounded-md ${config.className}`}>{config.label}</Badge>;
 }
@@ -784,6 +793,7 @@ function wholeNumber(value: string) {
 
 function emptyInventoryForm(): InventoryForm {
   return {
+    isActive: true,
     sellingPrice: "",
     purchasePrice: "",
     wholesalePrice: "",

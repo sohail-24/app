@@ -116,6 +116,7 @@ export const inventoryRouter = createRouter({
           batchNumber: z.string().optional(),
           expiryDate: z.string().optional(),
           notes: z.string().optional(),
+          isActive: z.boolean().optional(),
         }),
       })
     )
@@ -149,6 +150,7 @@ export const inventoryRouter = createRouter({
 
       const updateData = {
         ...input.data,
+        isActive: input.data.isActive,
         supplierId: input.data.supplierId,
         quantityOnHand,
         quantityReserved,
