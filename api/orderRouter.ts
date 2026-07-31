@@ -19,7 +19,7 @@ import {
 } from "./queries/orders";
 import { getCartTotal } from "./queries/cart";
 import { findProductById } from "./queries/products";
-import { findAllInventory } from "./queries/inventory";
+import { validateInventory } from "./queries/inventory";
 import { generateInvoiceFromOrder } from "./queries/invoices";
 import { calculateGstForOrder } from "./queries/gst";
 import { calculateShippingForOrder } from "./queries/shipping";
@@ -136,6 +136,14 @@ export const orderRouter = createRouter({
             message: "Orders can only contain products from one supplier.",
           });
         }
+
+        await validateInventory(
+          product.id,
+          product.supplierId,
+          product.name,
+          item.quantity
+        );
+
         gstItems.push({
           categoryId: product.categoryId,
           taxableAmount: Number(item.unitPrice) * item.quantity,
@@ -271,22 +279,12 @@ export const orderRouter = createRouter({
           });
         }
 
-        const [inventoryRecord] = await findAllInventory({
-          supplierId: product.supplierId,
-          productId: product.id,
-        });
-        if (!inventoryRecord) {
-          throw new TRPCError({
-            code: "BAD_REQUEST",
-            message: `${product.name} does not have inventory available.`,
-          });
-        }
-        if (inventoryRecord.quantityAvailable < item.quantity) {
-          throw new TRPCError({
-            code: "BAD_REQUEST",
-            message: `Insufficient inventory for ${product.name}.`,
-          });
-        }
+        const inventoryRecord = await validateInventory(
+          product.id,
+          product.supplierId,
+          product.name,
+          item.quantity
+        );
 
         const unitPrice = parseFloat(item.unitPrice?.toString() ?? "0");
         const totalPrice = unitPrice * item.quantity;
