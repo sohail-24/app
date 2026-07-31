@@ -28,7 +28,7 @@ export async function validateInventory(
     });
   }
 
-  if (!inventoryRecord.isActive) {
+  if (inventoryRecord.isActive === false) {
     throw new TRPCError({
       code: "BAD_REQUEST",
       message: `${productName} is currently inactive.`,

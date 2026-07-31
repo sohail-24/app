@@ -36,6 +36,9 @@ export async function findAllProducts(filters?: {
   const db = getDb();
   const conditions = [];
 
+  if (filters?.status === "active") {
+    conditions.push(or(eq(inventory.isActive, true), sql`${inventory.isActive} IS NULL`));
+  }
   if (filters?.status) {
     conditions.push(eq(products.status, filters.status as any));
   }
@@ -352,7 +355,7 @@ export async function findFeaturedProducts(limit = 8) {
         eq(inventory.supplierId, products.supplierId),
       ),
     )
-    .where(eq(products.status, "active"))
+    .where(and(eq(products.status, "active"), or(eq(inventory.isActive, true), sql`${inventory.isActive} IS NULL`)))
     .orderBy(desc(products.createdAt))
     .limit(limit);
 }
@@ -363,7 +366,7 @@ export async function countProducts(filters?: {
   search?: string;
 }) {
   const db = getDb();
-  const conditions = [eq(products.status, "active")];
+  const conditions = [eq(products.status, "active"), or(eq(inventory.isActive, true), sql`${inventory.isActive} IS NULL`)];
 
   if (filters?.categoryId) {
     conditions.push(eq(products.categoryId, filters.categoryId));
@@ -384,6 +387,7 @@ export async function countProducts(filters?: {
   const result = await db
     .select({ count: sql<number>`count(*)` })
     .from(products)
+    .leftJoin(inventory, and(eq(inventory.productId, products.id), eq(inventory.supplierId, products.supplierId)))
     .where(and(...conditions));
 
   return result[0]?.count ?? 0;
