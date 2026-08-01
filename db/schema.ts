@@ -351,6 +351,11 @@ export const products = pgTable(
     status: productStatusEnum("status")
       .default("draft")
       .notNull(),
+    // Marketplace presentation (one configuration per product, independent of inventory)
+    marketplaceVisible: boolean("marketplaceVisible").default(true).notNull(),
+    showInFreshDeals: boolean("showInFreshDeals").default(false).notNull(),
+    isFeatured: boolean("isFeatured").default(false).notNull(),
+    displayPriority: integer("displayPriority"),
     // SEO
     metaTitle: varchar("metaTitle", { length: 255 }),
     metaDescription: text("metaDescription"),
@@ -366,6 +371,10 @@ export const products = pgTable(
     categoryIdx: index("product_category_idx").on(table.categoryId),
     supplierIdx: index("product_supplier_idx").on(table.supplierId),
     statusIdx: index("product_status_idx").on(table.status),
+    marketplaceVisibleIdx: index("product_marketplace_visible_idx").on(table.marketplaceVisible),
+    freshDealsIdx: index("product_fresh_deals_idx").on(table.showInFreshDeals),
+    featuredIdx: index("product_featured_idx").on(table.isFeatured),
+    displayPriorityIdx: index("product_display_priority_idx").on(table.displayPriority),
     priceIdx: index("product_price_idx").on(table.unitPrice),
     organicIdx: index("product_organic_idx").on(table.organic),
     gradeIdx: index("product_grade_idx").on(table.grade),

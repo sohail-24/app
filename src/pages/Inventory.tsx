@@ -107,11 +107,19 @@ type ActionForm = {
   notes: string;
 };
 
+type MarketplaceForm = {
+  marketplaceVisible: boolean;
+  showInFreshDeals: boolean;
+  isFeatured: boolean;
+  displayPriority: string;
+};
+
 export default function Inventory() {
   const [search, setSearch] = useState("");
   const [status, setStatus] = useState<InventoryStatusFilter>("all");
   const [selectedId, setSelectedId] = useState<number | null>(null);
   const [form, setForm] = useState<InventoryForm>(() => emptyInventoryForm());
+  const [marketplaceForm, setMarketplaceForm] = useState<MarketplaceForm>(() => emptyMarketplaceForm());
   const [actionForm, setActionForm] = useState<ActionForm>({
     quantity: "1",
     warehouseLocation: "",
@@ -130,6 +138,9 @@ export default function Inventory() {
       utils.inventory.list.invalidate(),
       utils.inventory.stats.invalidate(),
       utils.product.list.invalidate(),
+      utils.product.freshDeals.invalidate(),
+      utils.product.featured.invalidate(),
+      utils.product.marketplaceById.invalidate(),
       utils.product.stats.invalidate(),
       utils.order.list.invalidate(),
       utils.order.recent.invalidate(),
@@ -158,9 +169,24 @@ export default function Inventory() {
     onSuccess: () => afterInventoryChange("Stock transferred."),
     onError: (error) => toast.error(error.message || "Could not transfer stock."),
   });
+  const updateMarketplace = trpc.product.updateMarketplace.useMutation({
+    onSuccess: () => afterInventoryChange("Marketplace settings saved."),
+    onError: (error) => toast.error(error.message || "Could not save marketplace settings."),
+  });
+  const deleteInventory = trpc.inventory.delete.useMutation({
+    onSuccess: async () => {
+      setSelectedId(null);
+      await afterInventoryChange("Inventory record deactivated. Existing orders are unchanged.");
+    },
+    onError: (error) => toast.error(error.message || "Could not delete inventory."),
+  });
 
   const inventory = inventoryQuery.data ?? [];
   const selected = inventory.find((item) => item.id === selectedId) ?? null;
+  const marketplaceQuery = trpc.product.marketplaceById.useQuery(
+    { id: selected?.productId ?? 0 },
+    { enabled: !!selected?.productId, retry: false },
+  );
   const suppliers = (companiesQuery.data ?? []).filter((company) => company.type === "supplier" || company.type === "both");
   const filtered = useMemo(() => {
     const query = search.trim().toLowerCase();
@@ -209,6 +235,21 @@ export default function Inventory() {
       notes: "",
     });
   }, [selected]);
+
+  useEffect(() => {
+    setMarketplaceForm(emptyMarketplaceForm());
+  }, [selected?.productId]);
+
+  useEffect(() => {
+    const marketplace = marketplaceQuery.data;
+    if (!marketplace) return;
+    setMarketplaceForm({
+      marketplaceVisible: marketplace.marketplaceVisible,
+      showInFreshDeals: marketplace.showInFreshDeals,
+      isFeatured: marketplace.isFeatured,
+      displayPriority: marketplace.displayPriority === null ? "" : String(marketplace.displayPriority),
+    });
+  }, [marketplaceQuery.data]);
 
   function saveSelectedInventory() {
     if (!selected) return;
@@ -265,6 +306,18 @@ export default function Inventory() {
         notes: actionForm.notes || undefined,
       });
     }
+  }
+
+  function saveMarketplaceSettings() {
+    if (!selected) return;
+    const priority = marketplaceForm.displayPriority.trim();
+    updateMarketplace.mutate({
+      id: selected.productId,
+      marketplaceVisible: marketplaceForm.marketplaceVisible,
+      showInFreshDeals: marketplaceForm.showInFreshDeals,
+      isFeatured: marketplaceForm.isFeatured,
+      displayPriority: priority ? wholeNumber(priority) : null,
+    });
   }
 
   return (
@@ -347,13 +400,20 @@ export default function Inventory() {
               item={selected}
               form={form}
               actionForm={actionForm}
+              marketplaceForm={marketplaceForm}
               suppliers={suppliers}
               saving={updateInventory.isPending}
+              marketplaceSaving={updateMarketplace.isPending}
+              marketplaceLoading={marketplaceQuery.isLoading}
               actionPending={stockIn.isPending || stockOut.isPending || adjustStock.isPending || transferStock.isPending}
+              deleting={deleteInventory.isPending}
               onFormChange={(field, value) => setForm((current) => ({ ...current, [field]: value }))}
               onActionChange={(field, value) => setActionForm((current) => ({ ...current, [field]: value }))}
+              onMarketplaceChange={(field, value) => setMarketplaceForm((current) => ({ ...current, [field]: value }))}
               onSave={saveSelectedInventory}
+              onSaveMarketplace={saveMarketplaceSettings}
               onAction={runStockAction}
+              onDelete={() => selected && deleteInventory.mutate({ id: selected.id })}
             />
           </div>
         </TabsContent>
@@ -543,24 +603,38 @@ function InventoryManager({
   item,
   form,
   actionForm,
+  marketplaceForm,
   suppliers,
   saving,
+  marketplaceSaving,
+  marketplaceLoading,
   actionPending,
+  deleting,
   onFormChange,
   onActionChange,
+  onMarketplaceChange,
   onSave,
+  onSaveMarketplace,
   onAction,
+  onDelete,
 }: {
   item: InventoryItem | null;
   form: InventoryForm;
   actionForm: ActionForm;
+  marketplaceForm: MarketplaceForm;
   suppliers: Array<{ id: number; name: string }>;
   saving: boolean;
+  marketplaceSaving: boolean;
+  marketplaceLoading: boolean;
   actionPending: boolean;
+  deleting: boolean;
   onFormChange: (field: keyof InventoryForm, value: any) => void;
   onActionChange: (field: keyof ActionForm, value: string) => void;
+  onMarketplaceChange: (field: keyof MarketplaceForm, value: any) => void;
   onSave: () => void;
+  onSaveMarketplace: () => void;
   onAction: (action: "in" | "out" | "adjust-add" | "adjust-remove" | "transfer") => void;
+  onDelete: () => void;
 }) {
   if (!item) {
     return (
@@ -640,6 +714,48 @@ function InventoryManager({
         </Button>
 
         <div className="rounded-lg border p-3">
+          <h4 className="text-sm font-semibold">Marketplace</h4>
+          <p className="mt-1 text-xs text-muted-foreground">
+            Buyer presentation settings are stored with this product. Inventory availability is managed separately.
+          </p>
+          <div className="mt-4 space-y-3">
+            <div className="flex items-center justify-between gap-3">
+              <div>
+                <Label htmlFor="marketplace-visible">Marketplace Visibility</Label>
+                <p className="text-xs text-muted-foreground">
+                  {marketplaceForm.marketplaceVisible
+                    ? "Visible to buyers when inventory is active."
+                    : "Hidden from every buyer marketplace surface."}
+                </p>
+              </div>
+              <Switch id="marketplace-visible" checked={marketplaceForm.marketplaceVisible} disabled={marketplaceLoading} onCheckedChange={(checked) => onMarketplaceChange("marketplaceVisible", checked)} />
+            </div>
+            <div className="flex items-center justify-between gap-3">
+              <div>
+                <Label htmlFor="fresh-deals">Show In Fresh Deals</Label>
+                <p className="text-xs text-muted-foreground">Adds this product to Today&apos;s Fresh Deals.</p>
+              </div>
+              <Switch id="fresh-deals" checked={marketplaceForm.showInFreshDeals} disabled={marketplaceLoading} onCheckedChange={(checked) => onMarketplaceChange("showInFreshDeals", checked)} />
+            </div>
+            <div className="flex items-center justify-between gap-3">
+              <div>
+                <Label htmlFor="featured-product">Featured Product</Label>
+                <p className="text-xs text-muted-foreground">Used by the buyer Featured Products section.</p>
+              </div>
+              <Switch id="featured-product" checked={marketplaceForm.isFeatured} disabled={marketplaceLoading} onCheckedChange={(checked) => onMarketplaceChange("isFeatured", checked)} />
+            </div>
+            <InventoryField label="Display Priority">
+              <Input type="number" min="0" placeholder="No priority" value={marketplaceForm.displayPriority} disabled={marketplaceLoading} onChange={(event) => onMarketplaceChange("displayPriority", event.target.value)} />
+            </InventoryField>
+            <p className="text-xs text-muted-foreground">Lower numbers appear first. Leave empty to keep the current order.</p>
+            <Button className="w-full" variant="outline" onClick={onSaveMarketplace} disabled={marketplaceLoading || marketplaceSaving}>
+              <Save className="mr-2 h-4 w-4" />
+              {marketplaceLoading ? "Loading..." : marketplaceSaving ? "Saving..." : "Save Marketplace Settings"}
+            </Button>
+          </div>
+        </div>
+
+        <div className="rounded-lg border p-3">
           <h4 className="text-sm font-semibold">Stock Actions</h4>
           <div className="mt-3 grid gap-3 sm:grid-cols-2">
             <InventoryField label="Quantity">
@@ -664,6 +780,12 @@ function InventoryManager({
               Transfer Warehouse
             </Button>
           </div>
+        </div>
+        <div className="border-t pt-4">
+          <p className="mb-2 text-xs text-muted-foreground">Deleting inventory deactivates this record and preserves existing orders.</p>
+          <Button className="w-full" variant="destructive" onClick={onDelete} disabled={deleting}>
+            {deleting ? "Deleting..." : "Delete Inventory"}
+          </Button>
         </div>
       </CardContent>
     </Card>
@@ -807,5 +929,14 @@ function emptyInventoryForm(): InventoryForm {
     warehouseLocation: "",
     batchNumber: "",
     notes: "",
+  };
+}
+
+function emptyMarketplaceForm(): MarketplaceForm {
+  return {
+    marketplaceVisible: true,
+    showInFreshDeals: false,
+    isFeatured: false,
+    displayPriority: "",
   };
 }

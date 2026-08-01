@@ -331,6 +331,14 @@ export const inventoryRouter = createRouter({
       return { success: true };
     }),
 
+  delete: ownerQuery
+    .input(z.object({ id: z.number().int().positive() }))
+    .mutation(async ({ input }) => {
+      await getRequiredInventoryRecord(input.id);
+      await updateInventory(input.id, { isActive: false });
+      return { success: true };
+    }),
+
   status: ownerQuery
     .input(z.object({ id: z.number().int().positive() }))
     .query(async ({ input }) => {

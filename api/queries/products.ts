@@ -41,7 +41,11 @@ type ProductFilters = {
  * from a missing product to buyers.
  */
 export function buyerProductVisibilityConditions(): SQL[] {
-  return [eq(products.status, "active"), eq(inventory.isActive, true)];
+  return [
+    eq(products.status, "active"),
+    eq(products.marketplaceVisible, true),
+    eq(inventory.isActive, true),
+  ];
 }
 
 function productFilterConditions(filters?: ProductFilters): SQL[] {
@@ -95,7 +99,11 @@ function productOrderBy(filters?: ProductFilters) {
       : desc(products.createdAt);
 }
 
-async function listProducts(filters?: ProductFilters, visibilityConditions: SQL[] = []) {
+async function listProducts(
+  filters?: ProductFilters,
+  visibilityConditions: SQL[] = [],
+  marketplaceOrdering = false,
+) {
   const db = getDb();
   const conditions = [...visibilityConditions, ...productFilterConditions(filters)];
 
@@ -144,7 +152,7 @@ async function listProducts(filters?: ProductFilters, visibilityConditions: SQL[
       ),
     )
     .where(conditions.length ? and(...conditions) : undefined)
-    .orderBy(orderByCol);
+    .orderBy(...(marketplaceOrdering ? [asc(products.displayPriority), orderByCol] : [orderByCol]));
 }
 
 export async function findAllProducts(filters?: ProductFilters) {
@@ -152,7 +160,15 @@ export async function findAllProducts(filters?: ProductFilters) {
 }
 
 export async function findBuyerProducts(filters?: ProductFilters) {
-  return listProducts(filters, buyerProductVisibilityConditions());
+  return listProducts(filters, buyerProductVisibilityConditions(), true);
+}
+
+export async function findFreshDealProducts(filters?: ProductFilters) {
+  return listProducts(
+    filters,
+    [...buyerProductVisibilityConditions(), eq(products.showInFreshDeals, true)],
+    true,
+  );
 }
 
 async function findProductDetailBySlug(slug: string, visibilityConditions: SQL[] = []) {
@@ -302,6 +318,31 @@ export async function updateProduct(id: number, data: Partial<InsertProduct>) {
     .where(eq(products.id, id));
 }
 
+export async function updateProductMarketplace(
+  id: number,
+  data: Pick<
+    InsertProduct,
+    "marketplaceVisible" | "showInFreshDeals" | "isFeatured" | "displayPriority"
+  >,
+) {
+  await updateProduct(id, data);
+}
+
+export async function findProductMarketplaceById(id: number) {
+  const rows = await getDb()
+    .select({
+      marketplaceVisible: products.marketplaceVisible,
+      showInFreshDeals: products.showInFreshDeals,
+      isFeatured: products.isFeatured,
+      displayPriority: products.displayPriority,
+    })
+    .from(products)
+    .where(eq(products.id, id))
+    .limit(1);
+
+  return rows[0] ?? null;
+}
+
 export async function deleteProduct(id: number) {
   await getDb()
     .update(products)
@@ -340,6 +381,29 @@ export async function getProductStats() {
     activeProducts: activeRows[0]?.count ?? 0,
     averageSellingPrice: avgRows[0]?.value ?? "0",
     recentlyAdded: recent,
+  };
+}
+
+export async function getBuyerProductStats() {
+  const buyerProducts = await findBuyerProducts({ sortBy: "newest" });
+  const totalProducts = buyerProducts.length;
+  const averageSellingPrice = totalProducts
+    ? (buyerProducts.reduce((total, product) => total + Number(product.unitPrice), 0) / totalProducts).toFixed(2)
+    : "0";
+
+  return {
+    totalProducts,
+    activeProducts: totalProducts,
+    averageSellingPrice,
+    recentlyAdded: buyerProducts.slice(0, 5).map((product) => ({
+      id: product.id,
+      name: product.name,
+      slug: product.slug,
+      unitPrice: product.unitPrice,
+      status: product.status,
+      createdAt: product.createdAt,
+      categoryName: product.categoryName,
+    })),
   };
 }
 
@@ -406,8 +470,8 @@ export async function findFeaturedProducts(limit = 8) {
         eq(inventory.supplierId, products.supplierId),
       ),
     )
-    .where(and(...buyerProductVisibilityConditions()))
-    .orderBy(desc(products.createdAt))
+    .where(and(...buyerProductVisibilityConditions(), eq(products.isFeatured, true)))
+    .orderBy(asc(products.displayPriority), desc(products.createdAt))
     .limit(limit);
 }
 

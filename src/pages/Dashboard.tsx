@@ -49,10 +49,10 @@ export default function Dashboard() {
   const { user } = useAuth();
   const role = getAppRole(user);
 
-  const productsQuery = trpc.product.list.useQuery(
-    { status: role === "buyer" ? "active" : undefined, sortBy: "newest" },
-    { retry: false },
-  );
+  const featuredProductsQuery = trpc.product.featured.useQuery(undefined, {
+    retry: false,
+    enabled: role === "buyer",
+  });
   const categoriesQuery = trpc.category.list.useQuery(undefined, { retry: false });
   const recentOrdersQuery = trpc.order.recent.useQuery({ limit: 5 }, { retry: false, enabled: !!user });
   const cartQuery = trpc.cart.list.useQuery(undefined, {
@@ -63,8 +63,8 @@ export default function Dashboard() {
   if (role === "buyer") {
     return (
       <BuyerDashboard
-        products={productsQuery.data ?? []}
-        productsLoading={productsQuery.isLoading}
+        featuredProducts={featuredProductsQuery.data ?? []}
+        featuredLoading={featuredProductsQuery.isLoading}
         categoryCount={categoriesQuery.data?.length ?? 0}
         recentOrders={recentOrdersQuery.data ?? []}
         ordersLoading={recentOrdersQuery.isLoading}
@@ -78,33 +78,30 @@ export default function Dashboard() {
 }
 
 function BuyerDashboard({
-  products,
-  productsLoading,
+  featuredProducts,
+  featuredLoading,
   categoryCount,
   recentOrders,
   ordersLoading,
   cartCount,
   cartLoading,
 }: {
-  products: Array<{
+  featuredProducts: Array<{
     id: number;
     name: string;
     slug: string;
-    categoryName: string | null;
     supplierName: string | null;
-    unitPrice: unknown;
-    unitType: string;
-    minimumOrderQuantity: number;
+    minimumOrderQuantity?: number | null;
     image?: string | null;
   }>;
-  productsLoading: boolean;
+  featuredLoading: boolean;
   categoryCount: number;
   recentOrders: Array<{ id: number; orderNumber: string; totalAmount: unknown; status: string; orderedAt: Date; relatedCompanyName: string | null }>;
   ordersLoading: boolean;
   cartCount: number;
   cartLoading: boolean;
 }) {
-  const featured = products.slice(0, 4);
+  const featured = featuredProducts.slice(0, 4);
 
   return (
     <div className="mx-auto flex w-full max-w-[1500px] flex-col gap-6">
@@ -143,7 +140,7 @@ function BuyerDashboard({
             <CardTitle className="text-base">Featured Products</CardTitle>
           </CardHeader>
           <CardContent>
-            {productsLoading ? (
+            {featuredLoading ? (
               <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
                 {Array.from({ length: 4 }).map((_, index) => <Skeleton key={index} className="h-56" />)}
               </div>

@@ -87,6 +87,14 @@ export default function LandingPage() {
     },
     { retry: false },
   );
+  const freshDealsQuery = trpc.product.freshDeals.useQuery(
+    {
+      search: search.trim() || undefined,
+      categoryId: categoryId !== "all" ? Number(categoryId) : undefined,
+      sortBy: sort,
+    },
+    { retry: false },
+  );
   const cartQuery = trpc.cart.list.useQuery(undefined, {
     enabled: isAuthenticated,
     retry: false,
@@ -101,7 +109,7 @@ export default function LandingPage() {
 
   const categories = (categoriesQuery.data ?? []) as MarketplaceCategory[];
   const products = (productsQuery.data ?? []) as MarketplaceProduct[];
-  const featuredProducts = products.slice(0, 8);
+  const freshDeals = (freshDealsQuery.data ?? []) as MarketplaceProduct[];
   const recentProducts = products.slice(8, 8 + visibleRecent);
   const selectedCategory = categories.find((category) => String(category.id) === categoryId);
 
@@ -264,9 +272,9 @@ export default function LandingPage() {
           )}
 
           <ProductGrid
-            products={featuredProducts}
-            loading={productsQuery.isLoading}
-            emptyMessage="No active wholesale products found for this search."
+            products={freshDeals}
+            loading={freshDealsQuery.isLoading}
+            emptyMessage="No fresh deals are available for this search."
             onAdd={addProductToCart}
             pending={addToCart.isPending}
           />

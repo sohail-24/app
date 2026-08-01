@@ -10,12 +10,16 @@ import {
   findProductById,
   findBuyerProductById,
   findFeaturedProducts,
+  findFreshDealProducts,
   countProducts,
   createProductWithInventory,
   deleteProduct,
   findProductBySku,
   getProductStats,
+  getBuyerProductStats,
   updateProduct,
+  updateProductMarketplace,
+  findProductMarketplaceById,
 } from "./queries/products";
 import { findCategoryById } from "./queries/categories";
 import { findCompanyById } from "./queries/companies";
@@ -55,6 +59,29 @@ const productMutationSchema = z.object({
 
 const productUpdateSchema = productMutationSchema.partial().extend({
   id: z.number().int().positive(),
+});
+
+const productListFilterSchema = z
+  .object({
+    categoryId: z.number().optional(),
+    supplierId: z.number().optional(),
+    status: z.string().optional(),
+    organic: z.boolean().optional(),
+    grade: z.string().optional(),
+    minPrice: z.number().optional(),
+    maxPrice: z.number().optional(),
+    search: z.string().optional(),
+    sortBy: z.enum(["price", "name", "newest"]).optional(),
+    sortOrder: z.enum(["asc", "desc"]).optional(),
+  })
+  .optional();
+
+const marketplaceUpdateSchema = z.object({
+  id: z.number().int().positive(),
+  marketplaceVisible: z.boolean(),
+  showInFreshDeals: z.boolean(),
+  isFeatured: z.boolean(),
+  displayPriority: z.number().int().min(0).nullable(),
 });
 
 function slugify(value: string) {
@@ -120,28 +147,17 @@ function inventoryStatus(quantityAvailable: number, reorderLevel: number) {
 
 export const productRouter = createRouter({
   list: publicQuery
-    .input(
-      z
-        .object({
-          categoryId: z.number().optional(),
-          supplierId: z.number().optional(),
-          status: z.string().optional(),
-          organic: z.boolean().optional(),
-          grade: z.string().optional(),
-          minPrice: z.number().optional(),
-          maxPrice: z.number().optional(),
-          search: z.string().optional(),
-          sortBy: z.enum(["price", "name", "newest"]).optional(),
-          sortOrder: z.enum(["asc", "desc"]).optional(),
-        })
-        .optional()
-    )
+    .input(productListFilterSchema)
     .query(async ({ ctx, input }) => {
       const filters = input ?? {};
       return canManageProducts(ctx.user)
         ? findAllProducts(filters)
         : findBuyerProducts(filters);
     }),
+
+  freshDeals: publicQuery
+    .input(productListFilterSchema)
+    .query(async ({ input }) => findFreshDealProducts(input ?? {})),
 
   bySlug: publicQuery
     .input(z.object({ slug: z.string() }))
@@ -193,8 +209,8 @@ export const productRouter = createRouter({
       return countProducts(input ?? {});
     }),
 
-  stats: publicQuery.query(async () => {
-    return getProductStats();
+  stats: publicQuery.query(async ({ ctx }) => {
+    return canManageProducts(ctx.user) ? getProductStats() : getBuyerProductStats();
   }),
 
   create: ownerQuery
@@ -414,6 +430,33 @@ export const productRouter = createRouter({
     }
     return { success: true };
   }),
+
+  updateMarketplace: ownerQuery
+    .input(marketplaceUpdateSchema)
+    .mutation(async ({ input }) => {
+      const existing = await findProductById(input.id);
+      if (!existing) {
+        throw new TRPCError({ code: "NOT_FOUND", message: "Product not found." });
+      }
+
+      await updateProductMarketplace(input.id, {
+        marketplaceVisible: input.marketplaceVisible,
+        showInFreshDeals: input.showInFreshDeals,
+        isFeatured: input.isFeatured,
+        displayPriority: input.displayPriority,
+      });
+      return { success: true };
+    }),
+
+  marketplaceById: ownerQuery
+    .input(z.object({ id: z.number().int().positive() }))
+    .query(async ({ input }) => {
+      const marketplace = await findProductMarketplaceById(input.id);
+      if (!marketplace) {
+        throw new TRPCError({ code: "NOT_FOUND", message: "Product not found." });
+      }
+      return marketplace;
+    }),
 
   delete: ownerQuery
     .input(z.object({ id: z.number().int().positive() }))
