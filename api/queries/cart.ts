@@ -27,10 +27,7 @@ export async function findCartByUserId(userId: number) {
     .leftJoin(products, eq(cartItems.productId, products.id))
     .innerJoin(
       inventory,
-      and(
-        eq(inventory.productId, products.id),
-        eq(inventory.supplierId, products.supplierId),
-      ),
+      eq(inventory.productId, products.id),
     )
     .where(and(eq(cartItems.userId, userId), ...buyerProductVisibilityConditions()))
     .orderBy(cartItems.createdAt);
