@@ -4,8 +4,11 @@ import { isOwner } from "@contracts/roles";
 import { createRouter, publicQuery, ownerQuery } from "./middleware";
 import {
   findAllProducts,
+  findBuyerProducts,
   findProductBySlug,
+  findBuyerProductBySlug,
   findProductById,
+  findBuyerProductById,
   findFeaturedProducts,
   countProducts,
   createProductWithInventory,
@@ -135,17 +138,18 @@ export const productRouter = createRouter({
     )
     .query(async ({ ctx, input }) => {
       const filters = input ?? {};
-      return findAllProducts({
-        ...filters,
-        status: canManageProducts(ctx.user) ? filters.status : "active",
-      });
+      return canManageProducts(ctx.user)
+        ? findAllProducts(filters)
+        : findBuyerProducts(filters);
     }),
 
   bySlug: publicQuery
     .input(z.object({ slug: z.string() }))
     .query(async ({ ctx, input }) => {
-      const product = await findProductBySlug(input.slug);
-      if (!product || (!canManageProducts(ctx.user) && product.status !== "active")) {
+      const product = canManageProducts(ctx.user)
+        ? await findProductBySlug(input.slug)
+        : await findBuyerProductBySlug(input.slug);
+      if (!product) {
         throw new TRPCError({
           code: "NOT_FOUND",
           message: "Product not found.",
@@ -157,8 +161,10 @@ export const productRouter = createRouter({
   byId: publicQuery
     .input(z.object({ id: z.number() }))
     .query(async ({ ctx, input }) => {
-      const product = await findProductById(input.id);
-      if (!product || (!canManageProducts(ctx.user) && product.status !== "active")) {
+      const product = canManageProducts(ctx.user)
+        ? await findProductById(input.id)
+        : await findBuyerProductById(input.id);
+      if (!product) {
         throw new TRPCError({
           code: "NOT_FOUND",
           message: "Product not found.",

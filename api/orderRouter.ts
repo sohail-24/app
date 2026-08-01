@@ -18,7 +18,7 @@ import {
   getRecentOrders,
 } from "./queries/orders";
 import { getCartTotal } from "./queries/cart";
-import { findProductById } from "./queries/products";
+import { findBuyerProductById } from "./queries/products";
 import { validateInventory } from "./queries/inventory";
 import { generateInvoiceFromOrder } from "./queries/invoices";
 import { calculateGstForOrder } from "./queries/gst";
@@ -122,8 +122,8 @@ export const orderRouter = createRouter({
       let supplierId: number | null = null;
       const gstItems = [];
       for (const item of cart.items) {
-        const product = await findProductById(item.productId);
-        if (!product || product.status !== "active") {
+        const product = await findBuyerProductById(item.productId);
+        if (!product) {
           throw new TRPCError({
             code: "BAD_REQUEST",
             message: "A product in your cart is no longer available.",
@@ -249,8 +249,8 @@ export const orderRouter = createRouter({
       let currency = "INR";
 
       for (const item of cart.items) {
-        const product = await findProductById(item.productId);
-        if (!product || product.status !== "active") {
+        const product = await findBuyerProductById(item.productId);
+        if (!product) {
           throw new TRPCError({
             code: "BAD_REQUEST",
             message: "A product in your cart is no longer available.",

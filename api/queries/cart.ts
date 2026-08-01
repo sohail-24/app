@@ -1,6 +1,7 @@
 import { getDb } from "./connection";
-import { cartItems, products } from "@db/schema";
+import { cartItems, inventory, products } from "@db/schema";
 import { eq, and } from "drizzle-orm";
+import { buyerProductVisibilityConditions } from "./products";
 
 export async function findCartByUserId(userId: number) {
   const db = getDb();
@@ -24,7 +25,14 @@ export async function findCartByUserId(userId: number) {
     })
     .from(cartItems)
     .leftJoin(products, eq(cartItems.productId, products.id))
-    .where(eq(cartItems.userId, userId))
+    .innerJoin(
+      inventory,
+      and(
+        eq(inventory.productId, products.id),
+        eq(inventory.supplierId, products.supplierId),
+      ),
+    )
+    .where(and(eq(cartItems.userId, userId), ...buyerProductVisibilityConditions()))
     .orderBy(cartItems.createdAt);
 }
 

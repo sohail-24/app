@@ -11,6 +11,7 @@ import {
   asc,
   sql,
   ne,
+  type SQL,
 } from "drizzle-orm";
 
 function withoutUndefined<T extends Record<string, unknown>>(data: T) {
@@ -21,7 +22,7 @@ function withoutUndefined<T extends Record<string, unknown>>(data: T) {
 
 // ─── Product Queries ───
 
-export async function findAllProducts(filters?: {
+type ProductFilters = {
   categoryId?: number;
   supplierId?: number;
   status?: string;
@@ -32,9 +33,19 @@ export async function findAllProducts(filters?: {
   search?: string;
   sortBy?: string;
   sortOrder?: "asc" | "desc";
-}) {
-  const db = getDb();
-  const conditions = [];
+};
+
+/**
+ * The single visibility rule for buyer-facing product reads. Keep this joined
+ * with inventory so inactive inventory makes the product indistinguishable
+ * from a missing product to buyers.
+ */
+export function buyerProductVisibilityConditions(): SQL[] {
+  return [eq(products.status, "active"), eq(inventory.isActive, true)];
+}
+
+function productFilterConditions(filters?: ProductFilters): SQL[] {
+  const conditions: SQL[] = [];
 
   if (filters?.status) {
     conditions.push(eq(products.status, filters.status as any));
@@ -69,16 +80,26 @@ export async function findAllProducts(filters?: {
     );
   }
 
-  const orderByCol =
-    filters?.sortBy === "price"
+  return conditions;
+}
+
+function productOrderBy(filters?: ProductFilters) {
+  return filters?.sortBy === "price"
+    ? filters.sortOrder === "asc"
+      ? asc(products.unitPrice)
+      : desc(products.unitPrice)
+    : filters?.sortBy === "name"
       ? filters.sortOrder === "asc"
-        ? asc(products.unitPrice)
-        : desc(products.unitPrice)
-      : filters?.sortBy === "name"
-        ? filters.sortOrder === "asc"
-          ? asc(products.name)
-          : desc(products.name)
-        : desc(products.createdAt);
+        ? asc(products.name)
+        : desc(products.name)
+      : desc(products.createdAt);
+}
+
+async function listProducts(filters?: ProductFilters, visibilityConditions: SQL[] = []) {
+  const db = getDb();
+  const conditions = [...visibilityConditions, ...productFilterConditions(filters)];
+
+  const orderByCol = productOrderBy(filters);
 
   return db
     .select({
@@ -126,7 +147,15 @@ export async function findAllProducts(filters?: {
     .orderBy(orderByCol);
 }
 
-export async function findProductBySlug(slug: string) {
+export async function findAllProducts(filters?: ProductFilters) {
+  return listProducts(filters);
+}
+
+export async function findBuyerProducts(filters?: ProductFilters) {
+  return listProducts(filters, buyerProductVisibilityConditions());
+}
+
+async function findProductDetailBySlug(slug: string, visibilityConditions: SQL[] = []) {
   const db = getDb();
   const rows = await db
     .select({
@@ -183,10 +212,18 @@ export async function findProductBySlug(slug: string) {
         eq(inventory.supplierId, products.supplierId),
       ),
     )
-    .where(eq(products.slug, slug))
+    .where(and(eq(products.slug, slug), ...visibilityConditions))
     .limit(1);
 
   return rows[0] ?? null;
+}
+
+export async function findProductBySlug(slug: string) {
+  return findProductDetailBySlug(slug);
+}
+
+export async function findBuyerProductBySlug(slug: string) {
+  return findProductDetailBySlug(slug, buyerProductVisibilityConditions());
 }
 
 export async function findProductBySku(sku: string, excludeId?: number) {
@@ -316,8 +353,25 @@ export async function findProductById(id: number) {
   });
 }
 
+export async function findBuyerProductById(id: number) {
+  const rows = await getDb()
+    .select({ product: products })
+    .from(products)
+    .innerJoin(
+      inventory,
+      and(
+        eq(inventory.productId, products.id),
+        eq(inventory.supplierId, products.supplierId),
+      ),
+    )
+    .where(and(eq(products.id, id), ...buyerProductVisibilityConditions()))
+    .limit(1);
+
+  return rows[0]?.product ?? null;
+}
+
 export async function findProductsByCategory(categoryId: number) {
-  return findAllProducts({ categoryId });
+  return findBuyerProducts({ categoryId });
 }
 
 export async function findFeaturedProducts(limit = 8) {
@@ -345,14 +399,14 @@ export async function findFeaturedProducts(limit = 8) {
     .from(products)
     .leftJoin(categories, eq(products.categoryId, categories.id))
     .leftJoin(companies, eq(products.supplierId, companies.id))
-    .leftJoin(
+    .innerJoin(
       inventory,
       and(
         eq(inventory.productId, products.id),
         eq(inventory.supplierId, products.supplierId),
       ),
     )
-    .where(eq(products.status, "active"))
+    .where(and(...buyerProductVisibilityConditions()))
     .orderBy(desc(products.createdAt))
     .limit(limit);
 }
@@ -363,7 +417,7 @@ export async function countProducts(filters?: {
   search?: string;
 }) {
   const db = getDb();
-  const conditions = [eq(products.status, "active")];
+  const conditions = [...buyerProductVisibilityConditions()];
 
   if (filters?.categoryId) {
     conditions.push(eq(products.categoryId, filters.categoryId));
@@ -384,6 +438,13 @@ export async function countProducts(filters?: {
   const result = await db
     .select({ count: sql<number>`count(*)` })
     .from(products)
+    .innerJoin(
+      inventory,
+      and(
+        eq(inventory.productId, products.id),
+        eq(inventory.supplierId, products.supplierId),
+      ),
+    )
     .where(and(...conditions));
 
   return result[0]?.count ?? 0;

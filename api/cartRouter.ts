@@ -9,7 +9,7 @@ import {
   getCartTotal,
   findCartByUserId,
 } from "./queries/cart";
-import { findProductById } from "./queries/products";
+import { findBuyerProductById } from "./queries/products";
 import { validateInventory } from "./queries/inventory";
 
 export const cartRouter = createRouter({
@@ -26,17 +26,11 @@ export const cartRouter = createRouter({
       })
     )
     .mutation(async ({ ctx, input }) => {
-      const product = await findProductById(input.productId);
+      const product = await findBuyerProductById(input.productId);
       if (!product) {
         throw new TRPCError({
           code: "NOT_FOUND",
           message: "Product not found",
-        });
-      }
-      if (product.status !== "active") {
-        throw new TRPCError({
-          code: "BAD_REQUEST",
-          message: "Product is not available for purchase",
         });
       }
       if (input.quantity < product.minimumOrderQuantity) {
@@ -80,7 +74,7 @@ export const cartRouter = createRouter({
         const existingCartItem = cartItems.find((item) => item.id === input.cartItemId);
 
         if (existingCartItem) {
-          const product = await findProductById(existingCartItem.productId);
+          const product = await findBuyerProductById(existingCartItem.productId);
           if (product) {
             await validateInventory(
               product.id,
