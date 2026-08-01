@@ -146,10 +146,7 @@ async function listProducts(
     .leftJoin(companies, eq(products.supplierId, companies.id))
     .leftJoin(
       inventory,
-      and(
-        eq(inventory.productId, products.id),
-        eq(inventory.supplierId, products.supplierId),
-      ),
+      eq(inventory.productId, products.id),
     )
     .where(conditions.length ? and(...conditions) : undefined)
     .orderBy(...(marketplaceOrdering ? [asc(products.displayPriority), orderByCol] : [orderByCol]));
@@ -223,10 +220,7 @@ async function findProductDetailBySlug(slug: string, visibilityConditions: SQL[]
     .leftJoin(companies, eq(products.supplierId, companies.id))
     .leftJoin(
       inventory,
-      and(
-        eq(inventory.productId, products.id),
-        eq(inventory.supplierId, products.supplierId),
-      ),
+      eq(inventory.productId, products.id),
     )
     .where(and(eq(products.slug, slug), ...visibilityConditions))
     .limit(1);
@@ -423,10 +417,7 @@ export async function findBuyerProductById(id: number) {
     .from(products)
     .innerJoin(
       inventory,
-      and(
-        eq(inventory.productId, products.id),
-        eq(inventory.supplierId, products.supplierId),
-      ),
+      eq(inventory.productId, products.id),
     )
     .where(and(eq(products.id, id), ...buyerProductVisibilityConditions()))
     .limit(1);
@@ -465,10 +456,7 @@ export async function findFeaturedProducts(limit = 8) {
     .leftJoin(companies, eq(products.supplierId, companies.id))
     .innerJoin(
       inventory,
-      and(
-        eq(inventory.productId, products.id),
-        eq(inventory.supplierId, products.supplierId),
-      ),
+      eq(inventory.productId, products.id),
     )
     .where(and(...buyerProductVisibilityConditions(), eq(products.isFeatured, true)))
     .orderBy(asc(products.displayPriority), desc(products.createdAt))
@@ -504,10 +492,7 @@ export async function countProducts(filters?: {
     .from(products)
     .innerJoin(
       inventory,
-      and(
-        eq(inventory.productId, products.id),
-        eq(inventory.supplierId, products.supplierId),
-      ),
+      eq(inventory.productId, products.id),
     )
     .where(and(...conditions));
 
