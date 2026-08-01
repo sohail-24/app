@@ -31,7 +31,24 @@ import {
   Trash2,
   UploadCloud,
   Warehouse,
+  Scale,
+  Boxes,
+  ShoppingBag,
+  Weight,
+  Grape,
+  CircleDot,
 } from "lucide-react";
+
+const unitStyles: Record<string, { icon: any; color: string; bg: string }> = {
+  kg: { icon: Scale, color: "text-emerald-500", bg: "bg-emerald-500/10" },
+  box: { icon: Package, color: "text-blue-600", bg: "bg-blue-600/10" },
+  case: { icon: Boxes, color: "text-purple-500", bg: "bg-purple-500/10" },
+  bag: { icon: ShoppingBag, color: "text-orange-500", bg: "bg-orange-500/10" },
+  lb: { icon: Weight, color: "text-red-500", bg: "bg-red-500/10" },
+  pallet: { icon: Warehouse, color: "text-cyan-500", bg: "bg-cyan-500/10" },
+  bunch: { icon: Grape, color: "text-pink-500", bg: "bg-pink-500/10" },
+  each: { icon: CircleDot, color: "text-yellow-500", bg: "bg-yellow-500/10" },
+};
 
 type ProductForm = {
   name: string;
@@ -420,11 +437,22 @@ export default function EditProduct() {
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
-                    {unitOptions.map((unit) => (
-                      <SelectItem key={unit} value={unit}>
-                        {unitLabels[unit] ?? unit}
-                      </SelectItem>
-                    ))}
+                    {unitOptions.map((unit) => {
+                      const style = unitStyles[unit];
+                      const Icon = style?.icon;
+                      return (
+                        <SelectItem key={unit} value={unit}>
+                          <div className="flex items-center gap-2">
+                            {Icon && (
+                              <div className={`flex h-6 w-6 items-center justify-center rounded-md ${style.bg} ${style.color}`}>
+                                <Icon className="h-4 w-4" />
+                              </div>
+                            )}
+                            <span>{unitLabels[unit] ?? unit}</span>
+                          </div>
+                        </SelectItem>
+                      );
+                    })}
                   </SelectContent>
                 </Select>
               </Field>
