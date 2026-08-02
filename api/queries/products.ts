@@ -45,6 +45,7 @@ export function buyerProductVisibilityConditions(): SQL[] {
     eq(products.status, "active"),
     eq(products.marketplaceVisible, true),
     eq(inventory.isActive, true),
+    gte(inventory.quantityAvailable, products.minimumOrderQuantity),
   ];
 }
 
