@@ -1,5 +1,13 @@
 node_modules
 dist
 .git
-*.swp
+coverage
+logs
+tmp
+cache
+.vscode
+.idea
 *.log
+.env
+.DS_Store
+Thumbs.db
