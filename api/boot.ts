@@ -6,9 +6,31 @@ import { appRouter } from "./router";
 import { createContext } from "./context";
 import { env } from "./lib/env";
 
+import { readFileSync } from "node:fs";
+import { resolve } from "node:path";
+
 const app = new Hono<{ Bindings: HttpBindings }>();
 
 app.use(bodyLimit({ maxSize: 50 * 1024 * 1024 }));
+
+let pkgVersion = "1.0.0";
+try {
+  const pkgPath = resolve(process.cwd(), "package.json");
+  const pkg = JSON.parse(readFileSync(pkgPath, "utf-8"));
+  if (pkg.version) pkgVersion = pkg.version;
+} catch {
+  // fallback if package.json is missing or unreadable
+}
+
+app.get("/health", (c) => {
+  return c.json({
+    status: "ok",
+    service: "FreshFlow",
+    version: pkgVersion,
+    timestamp: new Date().toISOString(),
+  });
+});
+
 app.use("/api/trpc/*", async (c) => {
   return fetchRequestHandler({
     endpoint: "/api/trpc",
