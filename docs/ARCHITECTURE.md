@@ -72,12 +72,20 @@ Current Drizzle tables:
 - `users`: authenticated users, local/mobile auth fields, role, company association, profile fields.
 - `otp_verifications`: mobile OTP challenge records.
 - `companies`: buyer, supplier, or both company records.
+- `customers`: customer management records.
 - `categories`: product taxonomy with active/inactive and sort ordering.
 - `products`: wholesale catalog items, pricing, images, status, grade, and supplier ownership.
 - `cart_items`: user-scoped cart rows.
 - `orders`: purchase order header, parties, totals, status, shipping, payment, and timestamps.
 - `order_items`: line-item snapshots for orders.
+- `invoices`: invoice headers.
+- `invoice_items`: invoice line items.
 - `inventory`: stock quantity, reserve, availability, reorder status, warehouse, and batch tracking.
+- `warehouses`: warehouse management records.
+- `warehouse_stock_movements`: history of stock movements.
+- `delivery_zones`: geographical delivery zones for shipping rules.
+- `gst_configurations`: tax configurations.
+- `shipping_methods`: available shipping methods.
 
 Important relationships:
 
@@ -101,6 +109,14 @@ Important relationships:
 - `order`: authenticated order list/detail/create/stats/recent; status updates are owner-only.
 - `inventory`: owner-only inventory list/detail/update/stats.
 - `company`: company list/detail/search.
+- `warehouse`: warehouse management.
+- `invoice`: invoice operations.
+- `report`: reporting aggregates.
+- `profile`: user profile management.
+- `customer`: customer records.
+- `deliveryZone`: delivery zone configurations.
+- `gst`: GST settings.
+- `shipping`: shipping method management.
 - `ping`: health check.
 
 Procedure types:

@@ -25,8 +25,8 @@ Foundation → Business Platform → Platform Engineering → DevOps → Cloud �
 
 ## User & Company
 
-- [ ] User Profile
-- [ ] Profile Update
+- [x] User Profile
+- [x] Profile Update
 - [ ] Company Profile
 - [ ] Business Settings
 - [ ] Role Mapping
@@ -53,8 +53,8 @@ Foundation → Business Platform → Platform Engineering → DevOps → Cloud �
 ## Inventory
 
 - [x] Inventory CRUD
-- [ ] Warehouse Management
-- [ ] Stock Movement History
+- [x] Warehouse Management
+- [x] Stock Movement History
 - [ ] Low Stock Alerts
 
 ## Orders
@@ -65,80 +65,34 @@ Foundation → Business Platform → Platform Engineering → DevOps → Cloud �
 - [ ] Order Approval
 - [ ] Order Dispatch
 - [ ] Delivery Tracking
-- [ ] Invoice Management
+- [x] Invoice Management
 
 ## Customers
 
-- [ ] Customer Management
+- [x] Customer Management
 - [ ] Supplier Profiles
 - [ ] Buyer Profiles
 
 ## Reports
 
-- [ ] Sales Reports
-- [ ] Inventory Reports
-- [ ] Order Analytics
+- [x] Sales Reports
+- [x] Inventory Reports
+- [x] Order Analytics
 - [ ] Business Dashboard
 
 ---
 
-# Phase 3 — Platform Engineering
+# Phase 1
+Docker & Docker Compose
 
-- [ ] Docker
-- [ ] Docker Compose
-- [ ] NGINX
-- [ ] Environment Management
-- [ ] Secrets Management
-- [ ] Health Checks
-- [ ] Logging
-- [ ] Production Configuration
+# Phase 2
+Deploy to a single server / VPS
 
----
+# Phase 3
+CI/CD
 
-# Phase 4 — DevOps
-
-- [ ] GitHub Actions
-- [ ] CI Pipeline
-- [ ] Automated Testing
-- [ ] Docker Image Build
-- [ ] Docker Image Scan
-- [ ] Deployment Pipeline
-
----
-
-# Phase 5 — Cloud
-
-- [ ] Terraform
-- [ ] AWS Infrastructure
-- [ ] PostgreSQL Production Database
-- [ ] Object Storage
-- [ ] CDN
-- [ ] Domain & SSL
-- [ ] Backup Strategy
-
----
-
-# Phase 6 — Kubernetes
-
-- [ ] Kubernetes
-- [ ] Helm
-- [ ] Ingress
-- [ ] HPA
-- [ ] Network Policies
-- [ ] ArgoCD
-- [ ] GitOps
-
----
-
-# Phase 7 — Observability
-
-- [ ] Prometheus
-- [ ] Grafana
-- [ ] Loki
-- [ ] Alertmanager
-- [ ] OpenTelemetry
-
----
+# Phase 4
+Kubernetes (future scaling)
 
 # Phase 8 — Enterprise SaaS
 
