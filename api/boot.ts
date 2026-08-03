@@ -48,6 +48,18 @@ if (env.isProduction) {
   const { serveStaticFiles } = await import("./lib/vite");
   serveStaticFiles(app);
 
+  try {
+    const { migrate } = await import("drizzle-orm/node-postgres/migrator");
+    const { getDb } = await import("./queries/connection");
+    console.log("Running database migrations...");
+    const db = getDb();
+    await migrate(db, { migrationsFolder: resolve(process.cwd(), "db/migrations") });
+    console.log("Database migrations completed successfully.");
+  } catch (error) {
+    console.error("Failed to run database migrations:", error);
+    process.exit(1);
+  }
+
   const port = parseInt(process.env.PORT || "3000");
   serve({ fetch: app.fetch, port }, () => {
     console.log(`Server running on http://localhost:${port}/`);
