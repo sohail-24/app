@@ -23,6 +23,23 @@ async function seed() {
   console.log("Creating companies...");
   const companyData = [
     {
+      name: "AMfruits-warehouse",
+      slug: "amfruits-warehouse",
+      type: "supplier" as const,
+      description: "Premium fruit warehouse supplier.",
+      email: "contact@amfruits-warehouse.com",
+      phone: "+1 (555) 123-4567",
+      addressLine1: "123 Fruit Ave",
+      city: "Los Angeles",
+      state: "CA",
+      postalCode: "90001",
+      country: "USA",
+      isVerified: true,
+      isActive: true,
+      minimumOrderAmount: "250.00",
+      paymentTerms: "net_30" as const,
+    },
+    {
       name: "Tropical Direct Wholesale",
       slug: "tropical-direct-wholesale",
       type: "supplier" as const,
