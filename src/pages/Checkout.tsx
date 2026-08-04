@@ -8,6 +8,7 @@ import { isValidIndianMobileNumber } from "@/lib/utils";
 
 import { PageHeader } from "@/components/freshflow/PageHeader";
 import { Button } from "@/components/ui/button";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
@@ -16,13 +17,13 @@ import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Separator } from "@/components/ui/separator";
 import { Textarea } from "@/components/ui/textarea";
-import { Loader2, Package, ShoppingCart, Truck } from "lucide-react";
+import { Loader2, Package, ShoppingCart, Truck, MapPin, Home, Briefcase } from "lucide-react";
 
 export default function Checkout() {
   const navigate = useNavigate();
   const utils = trpc.useUtils();
   const cartQuery = trpc.cart.list.useQuery(undefined, { retry: false });
-  const profileQuery = trpc.profile.current.useQuery(undefined, { retry: false });
+  const addressQuery = trpc.address.list.useQuery(undefined, { retry: false });
   const createOrder = trpc.order.create.useMutation({
     onSuccess: async (data) => {
       await Promise.all([
@@ -44,26 +45,33 @@ export default function Checkout() {
     state: "Telangana",
     city: "Hyderabad",
     address: "",
+    addressLine2: "",
     landmark: "",
+    areaLocality: "",
     slot: "",
     notes: "",
     confirmAddress: false,
     agreeTerms: false,
   });
+  const [isAddressModalOpen, setIsAddressModalOpen] = useState(false);
   const hasAutoFilled = useRef(false);
   useEffect(() => {
-    if (profileQuery.data && !hasAutoFilled.current) {
+    if (addressQuery.data && addressQuery.data.length > 0 && !hasAutoFilled.current) {
+      const defaultAddr = addressQuery.data.find(a => a.isDefault) || addressQuery.data[0];
       setForm((prev) => ({
         ...prev,
-        contactName: prev.contactName || profileQuery.data.name || "",
-        mobileNumber: prev.mobileNumber || profileQuery.data.phone?.replace(/^\+91/, "") || "",
-        address: prev.address || profileQuery.data.addressLine1 || "",
-        city: prev.city || profileQuery.data.city || "Hyderabad",
-        state: prev.state || profileQuery.data.state || "Telangana",
+        contactName: defaultAddr.fullName || "",
+        mobileNumber: defaultAddr.mobileNumber || "",
+        address: defaultAddr.addressLine1 || "",
+        addressLine2: defaultAddr.addressLine2 || "",
+        landmark: defaultAddr.landmark || "",
+        areaLocality: defaultAddr.areaLocality || "",
+        city: defaultAddr.city || "Hyderabad",
+        state: defaultAddr.state || "Telangana",
       }));
       hasAutoFilled.current = true;
     }
-  }, [profileQuery.data]);
+  }, [addressQuery.data]);
 
   const cities = useMemo(() => citiesByState[form.state] ?? [], [form.state]);
   const items = cartQuery.data?.items ?? [];
@@ -79,6 +87,22 @@ export default function Checkout() {
 
   if (cartQuery.isLoading) {
     return <div className="py-16 text-center"><Loader2 className="mx-auto h-8 w-8 animate-spin text-emerald-600" /></div>;
+  }
+
+
+  function handleSelectAddress(addr: any) {
+    setForm(prev => ({
+      ...prev,
+      contactName: addr.fullName,
+      mobileNumber: addr.mobileNumber,
+      address: addr.addressLine1,
+      addressLine2: addr.addressLine2 || "",
+      landmark: addr.landmark || "",
+      areaLocality: addr.areaLocality || "",
+      city: addr.city,
+      state: addr.state,
+    }));
+    setIsAddressModalOpen(false);
   }
 
   if (items.length === 0) {
@@ -98,7 +122,12 @@ export default function Checkout() {
       return;
     }
     createOrder.mutate({
+      shippingContactName: form.contactName,
+      shippingMobileNumber: form.mobileNumber,
       shippingAddressLine1: form.address,
+      shippingAddressLine2: form.addressLine2 || undefined,
+      shippingLandmark: form.landmark || undefined,
+      shippingAreaLocality: form.areaLocality || undefined,
       shippingCity: form.city,
       shippingState: form.state,
       shippingCountry: "IND",
@@ -112,7 +141,41 @@ export default function Checkout() {
       <PageHeader backTo="/cart" backLabel="Back to Cart" title="Checkout" />
       <form onSubmit={handleSubmit} className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_320px]">
         <Card>
-          <CardHeader><CardTitle className="flex items-center gap-2 text-base"><Truck className="h-4 w-4" />Shipping Information</CardTitle></CardHeader>
+          <CardHeader className="flex flex-row items-center justify-between">
+            <CardTitle className="flex items-center gap-2 text-base"><Truck className="h-4 w-4" />Shipping Information</CardTitle>
+            {addressQuery.data && addressQuery.data.length > 0 && (
+              <Dialog open={isAddressModalOpen} onOpenChange={setIsAddressModalOpen}>
+                <DialogTrigger asChild>
+                  <Button variant="outline" size="sm">Change Address</Button>
+                </DialogTrigger>
+                <DialogContent className="max-w-md max-h-[80vh] overflow-y-auto">
+                  <DialogHeader>
+                    <DialogTitle>Select Address</DialogTitle>
+                  </DialogHeader>
+                  <div className="grid gap-3 py-4">
+                    {addressQuery.data.map(addr => (
+                      <div key={addr.id} onClick={() => handleSelectAddress(addr)} className="cursor-pointer rounded-lg border p-3 hover:border-primary">
+                        <div className="mb-1 flex items-center justify-between">
+                          <div className="flex items-center gap-2 font-medium">
+                            {addr.addressType === "home" ? <Home className="h-4 w-4 text-muted-foreground" /> : addr.addressType === "work" ? <Briefcase className="h-4 w-4 text-muted-foreground" /> : <MapPin className="h-4 w-4 text-muted-foreground" />}
+                            {addr.fullName}
+                          </div>
+                          {addr.isDefault && <span className="rounded bg-primary/10 px-2 py-0.5 text-xs text-primary">Default</span>}
+                        </div>
+                        <div className="text-sm text-muted-foreground">
+                          {addr.addressLine1}{addr.addressLine2 ? `, ${addr.addressLine2}` : ""}
+                          <br />
+                          {addr.areaLocality ? `${addr.areaLocality}, ` : ""}{addr.city}, {addr.state} {addr.postalCode}
+                          <br />
+                          {addr.mobileNumber}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </DialogContent>
+              </Dialog>
+            )}
+          </CardHeader>
           <CardContent className="space-y-6">
             <div className="grid gap-4 sm:grid-cols-2">
               <div className="space-y-2">

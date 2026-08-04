@@ -77,8 +77,12 @@ type OrderDetailData = {
   taxAmount: unknown;
   shippingAmount: unknown;
   totalAmount: unknown;
+  shippingContactName: string | null;
+  shippingMobileNumber: string | null;
   shippingAddressLine1: string | null;
   shippingAddressLine2: string | null;
+  shippingLandmark: string | null;
+  shippingAreaLocality: string | null;
   shippingCity: string | null;
   shippingState: string | null;
   shippingPostalCode: string | null;
@@ -419,10 +423,11 @@ function formatDelivery(value: DeliveryEstimate | null) {
   return value ? deliveryLabels[value] : "Not set";
 }
 
-function formatAddress(order: Pick<OrderDetailData, "shippingAddressLine1" | "shippingAddressLine2" | "shippingCity" | "shippingState" | "shippingPostalCode" | "shippingCountry">) {
+function formatAddress(order: Partial<OrderDetailData>) {
   return [
     order.shippingAddressLine1,
     order.shippingAddressLine2,
+    order.shippingAreaLocality,
     order.shippingCity,
     order.shippingState,
     order.shippingPostalCode,
