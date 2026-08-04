@@ -1,15 +1,36 @@
 version: '3.8'
 
 services:
+  nginx:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: proxy
+    image: freshflow-nginx
+    container_name: freshflow-nginx
+    restart: always
+    ports:
+      - "80:80"
+    depends_on:
+      app:
+        condition: service_healthy
+    networks:
+      - freshflow-network
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost/nginx-health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+
   app:
     build:
       context: .
       dockerfile: Dockerfile
+      target: production
     image: freshflow-app
     container_name: freshflow-app
     restart: always
-    ports:
-      - "3000:3000"
     environment:
       - NODE_ENV=production
       - DATABASE_URL=${DATABASE_URL}
