@@ -169,7 +169,7 @@ function AddressBook() {
                 <Field label="Full Name" required><Input value={form.fullName} onChange={(e) => setForm({ ...form, fullName: e.target.value })} /></Field>
                 <Field label="Mobile Number" required><Input value={form.mobileNumber} onChange={(e) => setForm({ ...form, mobileNumber: e.target.value })} placeholder="10 digits" /></Field>
               </div>
-              <Field label="Address Line 1" required><Input value={form.addressLine1} onChange={(e) => setForm({ ...form, addressLine1: e.target.value })} placeholder="House/Flat No, Building Name" /></Field>
+              <Field label="House / Flat No. & Street Address" required><Input value={form.addressLine1} onChange={(e) => setForm({ ...form, addressLine1: e.target.value })} placeholder="House/Flat No, Building Name" /></Field>
               <Field label="Address Line 2 (Optional)"><Input value={form.addressLine2 || ""} onChange={(e) => setForm({ ...form, addressLine2: e.target.value })} placeholder="Street, Sector, Village" /></Field>
               <div className="grid grid-cols-2 gap-4">
                 <Field label="Landmark (Optional)"><Input value={form.landmark || ""} onChange={(e) => setForm({ ...form, landmark: e.target.value })} placeholder="e.g. Near Apollo Hospital" /></Field>
@@ -228,19 +228,19 @@ function AddressBook() {
                 <Badge variant="default" className="absolute -top-2.5 -right-2.5 shadow-sm">Default</Badge>
               )}
               <div>
-                <div className="mb-2 flex items-center justify-between">
+                <div className="mb-4">
                   <div className="flex items-center gap-2 font-medium">
                     {address.addressType === "home" ? <Home className="h-4 w-4 text-muted-foreground" /> : address.addressType === "work" ? <Briefcase className="h-4 w-4 text-muted-foreground" /> : <MapPin className="h-4 w-4 text-muted-foreground" />}
                     {address.fullName}
                   </div>
-                  <span className="text-sm text-muted-foreground">{address.mobileNumber}</span>
+                  <div className="text-sm text-muted-foreground">{address.mobileNumber?.replace(/^\+91/, "")}</div>
                 </div>
-                <div className="text-sm text-muted-foreground line-clamp-3">
-                  {address.addressLine1}
-                  {address.addressLine2 ? `, ${address.addressLine2}` : ""}
-                  <br />
-                  {address.areaLocality ? `${address.areaLocality}, ` : ""}{address.city}, {address.state} {address.postalCode}
-                  {address.landmark ? <><br /><span className="text-xs opacity-75">Landmark: {address.landmark}</span></> : null}
+                <div className="text-sm text-muted-foreground">
+                  <div>{address.addressLine1}</div>
+                  {address.addressLine2 && <div>{address.addressLine2}</div>}
+                  {address.landmark && <div>Near {address.landmark.replace(/^Near /i, "")}</div>}
+                  {address.areaLocality && <div>{address.areaLocality}</div>}
+                  <div>{address.city}, {address.state}{address.postalCode ? ` - ${address.postalCode}` : ""}</div>
                 </div>
               </div>
               <div className="mt-4 flex items-center gap-2">
