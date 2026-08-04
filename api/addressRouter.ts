@@ -13,7 +13,7 @@ import {
 const addressSchema = z.object({
   fullName: z.string().min(1, "Full Name is required").max(255),
   mobileNumber: z.string().min(10, "Mobile number is required").max(50),
-  addressLine1: z.string().min(1, "Address Line 1 is required").max(255),
+  addressLine1: z.string().trim().min(10, "Please enter a complete street address (minimum 10 characters).").max(300),
   addressLine2: z.string().max(255).optional().nullable(),
   landmark: z.string().max(255).optional().nullable(),
   areaLocality: z.string().max(255).optional().nullable(),
