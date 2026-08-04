@@ -15,6 +15,7 @@ import {
 
 export const authProviderEnum = pgEnum("authProvider", ["local", "mobile"]);
 export const userRoleEnum = pgEnum("role", ["user", "admin"]);
+export const addressTypeEnum = pgEnum("addressType", ["home", "work", "other"]);
 export const companyTypeEnum = pgEnum("company_type", [
   "supplier",
   "buyer",
@@ -185,6 +186,42 @@ export const otpVerifications = pgTable(
 
 export type OtpVerification = typeof otpVerifications.$inferSelect;
 export type InsertOtpVerification = typeof otpVerifications.$inferInsert;
+
+
+// ─────────────────────────────────────────────────────────────
+// USER ADDRESSES — Multiple saved addresses for buyers
+// ─────────────────────────────────────────────────────────────
+export const userAddresses = pgTable(
+  "user_addresses",
+  {
+    id: bigserial("id", { mode: "number" }).primaryKey(),
+    userId: bigint("userId", { mode: "number" }).notNull(),
+    fullName: varchar("fullName", { length: 255 }).notNull(),
+    mobileNumber: varchar("mobileNumber", { length: 50 }).notNull(),
+    addressLine1: varchar("addressLine1", { length: 255 }).notNull(),
+    addressLine2: varchar("addressLine2", { length: 255 }),
+    landmark: varchar("landmark", { length: 255 }),
+    areaLocality: varchar("areaLocality", { length: 255 }),
+    city: varchar("city", { length: 100 }).notNull(),
+    state: varchar("state", { length: 100 }).notNull(),
+    postalCode: varchar("postalCode", { length: 20 }).notNull(),
+    country: varchar("country", { length: 100 }).default("India").notNull(),
+    addressType: addressTypeEnum("addressType").default("home").notNull(),
+    isDefault: boolean("isDefault").default(false).notNull(),
+    createdAt: timestamp("createdAt").defaultNow().notNull(),
+    updatedAt: timestamp("updatedAt")
+      .defaultNow()
+      .notNull()
+      .$onUpdate(() => new Date()),
+  },
+  (table) => ({
+    userIdx: index("user_address_user_idx").on(table.userId),
+    defaultIdx: index("user_address_default_idx").on(table.isDefault),
+  })
+);
+
+export type UserAddress = typeof userAddresses.$inferSelect;
+export type InsertUserAddress = typeof userAddresses.$inferInsert;
 
 // ─────────────────────────────────────────────────────────────
 // COMPANIES — B2B entities (buyers, suppliers, or both)
@@ -452,8 +489,12 @@ export const orders = pgTable(
       .default("pending")
       .notNull(),
     // Shipping
+    shippingContactName: varchar("shippingContactName", { length: 255 }),
+    shippingMobileNumber: varchar("shippingMobileNumber", { length: 50 }),
     shippingAddressLine1: varchar("shippingAddressLine1", { length: 255 }),
     shippingAddressLine2: varchar("shippingAddressLine2", { length: 255 }),
+    shippingLandmark: varchar("shippingLandmark", { length: 255 }),
+    shippingAreaLocality: varchar("shippingAreaLocality", { length: 255 }),
     shippingCity: varchar("shippingCity", { length: 100 }),
     shippingState: varchar("shippingState", { length: 100 }),
     shippingPostalCode: varchar("shippingPostalCode", { length: 20 }),

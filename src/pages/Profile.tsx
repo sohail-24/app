@@ -20,6 +20,7 @@ import {
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import {
@@ -36,7 +37,7 @@ import { Label } from "@/components/ui/label";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
-import { AlertCircle, Camera, KeyRound, Save, Trash2 } from "lucide-react";
+import { AlertCircle, Camera, KeyRound, Save, Trash2, Home, Briefcase, MapPin, Plus, Edit } from "lucide-react";
 
 type Gender = "male" | "female" | "other" | "prefer_not_to_say";
 type ThemePreference = "system" | "light" | "dark";
@@ -66,6 +67,208 @@ const emptyForm: ProfileForm = {
   postalCode: "",
   themePreference: "system",
 };
+
+
+function AddressBook() {
+  const utils = trpc.useUtils();
+  const addressQuery = trpc.address.list.useQuery();
+  const addresses = addressQuery.data || [];
+
+  const [isDialogOpen, setIsDialogOpen] = useState(false);
+  const [editingAddress, setEditingAddress] = useState<any>(null);
+
+  const defaultForm = {
+    fullName: "",
+    mobileNumber: "",
+    addressLine1: "",
+    addressLine2: "",
+    landmark: "",
+    areaLocality: "",
+    city: "",
+    state: "Telangana",
+    postalCode: "",
+    country: "India",
+    addressType: "home" as "home" | "work" | "other",
+    isDefault: false,
+  };
+  const [form, setForm] = useState(defaultForm);
+
+  const createMutation = trpc.address.create.useMutation({
+    onSuccess: () => {
+      utils.address.list.invalidate();
+      setIsDialogOpen(false);
+      toast.success("Address added successfully.");
+    },
+    onError: (err) => toast.error(err.message),
+  });
+
+  const updateMutation = trpc.address.update.useMutation({
+    onSuccess: () => {
+      utils.address.list.invalidate();
+      setIsDialogOpen(false);
+      toast.success("Address updated successfully.");
+    },
+    onError: (err) => toast.error(err.message),
+  });
+
+  const deleteMutation = trpc.address.delete.useMutation({
+    onSuccess: () => {
+      utils.address.list.invalidate();
+      toast.success("Address deleted.");
+    },
+  });
+
+  const setDefaultMutation = trpc.address.setDefault.useMutation({
+    onSuccess: () => {
+      utils.address.list.invalidate();
+      toast.success("Default address updated.");
+    },
+  });
+
+  function handleOpenForm(address?: any) {
+    if (address) {
+      setEditingAddress(address);
+      setForm({ ...address });
+    } else {
+      setEditingAddress(null);
+      setForm({ ...defaultForm, isDefault: addresses.length === 0 });
+    }
+    setIsDialogOpen(true);
+  }
+
+  function handleSave() {
+    if (!form.fullName || !form.mobileNumber || !form.addressLine1 || !form.city || !form.state || !form.postalCode) {
+      toast.error("Please fill in all required fields.");
+      return;
+    }
+    if (editingAddress) {
+      updateMutation.mutate({ id: editingAddress.id, ...form });
+    } else {
+      createMutation.mutate(form);
+    }
+  }
+
+  if (addressQuery.isLoading) return <Skeleton className="h-64 w-full" />;
+
+  return (
+    <Card>
+      <CardHeader className="flex flex-row items-center justify-between">
+        <div>
+          <CardTitle className="text-base">Address Book</CardTitle>
+          <CardDescription>Manage your delivery addresses.</CardDescription>
+        </div>
+        <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
+          <DialogTrigger asChild>
+            <Button onClick={() => handleOpenForm()} size="sm" variant="outline">
+              <Plus className="mr-2 h-4 w-4" /> Add Address
+            </Button>
+          </DialogTrigger>
+          <DialogContent className="max-w-md sm:max-w-lg max-h-[90vh] overflow-y-auto">
+            <DialogHeader>
+              <DialogTitle>{editingAddress ? "Edit Address" : "Add New Address"}</DialogTitle>
+            </DialogHeader>
+            <div className="grid gap-4 py-4">
+              <div className="grid grid-cols-2 gap-4">
+                <Field label="Full Name" required><Input value={form.fullName} onChange={(e) => setForm({ ...form, fullName: e.target.value })} /></Field>
+                <Field label="Mobile Number" required><Input value={form.mobileNumber} onChange={(e) => setForm({ ...form, mobileNumber: e.target.value })} placeholder="10 digits" /></Field>
+              </div>
+              <Field label="Address Line 1" required><Input value={form.addressLine1} onChange={(e) => setForm({ ...form, addressLine1: e.target.value })} placeholder="House/Flat No, Building Name" /></Field>
+              <Field label="Address Line 2 (Optional)"><Input value={form.addressLine2 || ""} onChange={(e) => setForm({ ...form, addressLine2: e.target.value })} placeholder="Street, Sector, Village" /></Field>
+              <div className="grid grid-cols-2 gap-4">
+                <Field label="Landmark (Optional)"><Input value={form.landmark || ""} onChange={(e) => setForm({ ...form, landmark: e.target.value })} placeholder="e.g. Near Apollo Hospital" /></Field>
+                <Field label="Area / Locality"><Input value={form.areaLocality || ""} onChange={(e) => setForm({ ...form, areaLocality: e.target.value })} /></Field>
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <Field label="City" required><Input value={form.city} onChange={(e) => setForm({ ...form, city: e.target.value })} /></Field>
+                <Field label="State" required>
+                  <Select value={form.state} onValueChange={(v) => setForm({ ...form, state: v })}>
+                    <SelectTrigger><SelectValue placeholder="Select state" /></SelectTrigger>
+                    <SelectContent>{indianStates.map(s => <SelectItem key={s} value={s}>{s}</SelectItem>)}</SelectContent>
+                  </Select>
+                </Field>
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <Field label="Postal Code" required><Input value={form.postalCode} onChange={(e) => setForm({ ...form, postalCode: e.target.value })} /></Field>
+                <Field label="Address Type">
+                  <Select value={form.addressType} onValueChange={(v: any) => setForm({ ...form, addressType: v })}>
+                    <SelectTrigger><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="home">Home</SelectItem>
+                      <SelectItem value="work">Work</SelectItem>
+                      <SelectItem value="other">Other</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </Field>
+              </div>
+              {!editingAddress && (
+                <div className="flex items-center space-x-2">
+                  <Checkbox id="isDefault" checked={form.isDefault} onCheckedChange={(checked) => setForm({ ...form, isDefault: !!checked })} />
+                  <label htmlFor="isDefault" className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70">
+                    Make this my default address
+                  </label>
+                </div>
+              )}
+            </div>
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setIsDialogOpen(false)}>Cancel</Button>
+              <Button onClick={handleSave} disabled={createMutation.isPending || updateMutation.isPending}>
+                {editingAddress ? "Save Changes" : "Save Address"}
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+      </CardHeader>
+      <CardContent className="grid gap-4 sm:grid-cols-2">
+        {addresses.length === 0 ? (
+          <div className="col-span-full py-8 text-center text-muted-foreground">
+            <MapPin className="mx-auto mb-2 h-8 w-8 opacity-20" />
+            <p>No addresses saved yet.</p>
+          </div>
+        ) : (
+          addresses.map((address: any) => (
+            <div key={address.id} className={`relative flex flex-col justify-between rounded-lg border p-4 shadow-sm ${address.isDefault ? 'border-primary bg-primary/5' : ''}`}>
+              {address.isDefault && (
+                <Badge variant="default" className="absolute -top-2.5 -right-2.5 shadow-sm">Default</Badge>
+              )}
+              <div>
+                <div className="mb-2 flex items-center justify-between">
+                  <div className="flex items-center gap-2 font-medium">
+                    {address.addressType === "home" ? <Home className="h-4 w-4 text-muted-foreground" /> : address.addressType === "work" ? <Briefcase className="h-4 w-4 text-muted-foreground" /> : <MapPin className="h-4 w-4 text-muted-foreground" />}
+                    {address.fullName}
+                  </div>
+                  <span className="text-sm text-muted-foreground">{address.mobileNumber}</span>
+                </div>
+                <div className="text-sm text-muted-foreground line-clamp-3">
+                  {address.addressLine1}
+                  {address.addressLine2 ? `, ${address.addressLine2}` : ""}
+                  <br />
+                  {address.areaLocality ? `${address.areaLocality}, ` : ""}{address.city}, {address.state} {address.postalCode}
+                  {address.landmark ? <><br /><span className="text-xs opacity-75">Landmark: {address.landmark}</span></> : null}
+                </div>
+              </div>
+              <div className="mt-4 flex items-center gap-2">
+                <Button variant="secondary" size="sm" className="h-8 flex-1" onClick={() => handleOpenForm(address)}>
+                  <Edit className="mr-2 h-3.5 w-3.5" /> Edit
+                </Button>
+                {!address.isDefault && (
+                  <Button variant="outline" size="sm" className="h-8" onClick={() => setDefaultMutation.mutate({ id: address.id })} disabled={setDefaultMutation.isPending}>
+                    Set Default
+                  </Button>
+                )}
+                <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive hover:bg-destructive/10 hover:text-destructive" onClick={() => {
+                  if (confirm("Delete this address?")) deleteMutation.mutate({ id: address.id });
+                }}>
+                  <Trash2 className="h-4 w-4" />
+                </Button>
+              </div>
+            </div>
+          ))
+        )}
+      </CardContent>
+    </Card>
+  );
+}
+
 
 export default function Profile() {
   const utils = trpc.useUtils();
@@ -294,35 +497,7 @@ export default function Profile() {
           </CardContent>
         </Card>
 
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-base">Contact Information</CardTitle>
-            <CardDescription>Personal address only. Company details stay in Company settings.</CardDescription>
-          </CardHeader>
-          <CardContent className="grid gap-4 sm:grid-cols-2">
-            <Field label="Address Line">
-              <Input value={form.addressLine1} onChange={(event) => setForm({ ...form, addressLine1: event.target.value })} />
-            </Field>
-            <Field label="City">
-              <Input value={form.city} onChange={(event) => setForm({ ...form, city: event.target.value })} />
-            </Field>
-            <Field label="State">
-              <Select value={form.state || "unset"} onValueChange={(value) => setForm({ ...form, state: value === "unset" ? "" : value })}>
-                <SelectTrigger><SelectValue placeholder="Select state" /></SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="unset">Not set</SelectItem>
-                  {indianStates.map((state) => <SelectItem key={state} value={state}>{state}</SelectItem>)}
-                </SelectContent>
-              </Select>
-            </Field>
-            <Field label="Country">
-              <Input value={form.country} onChange={(event) => setForm({ ...form, country: event.target.value })} />
-            </Field>
-            <Field label="Postal Code">
-              <Input value={form.postalCode} onChange={(event) => setForm({ ...form, postalCode: event.target.value })} />
-            </Field>
-          </CardContent>
-        </Card>
+        <AddressBook />
       </section>
 
       <section className="grid gap-4 lg:grid-cols-2">

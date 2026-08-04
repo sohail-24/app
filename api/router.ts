@@ -10,6 +10,7 @@ import { warehouseRouter } from "./warehouseRouter";
 import { invoiceRouter } from "./invoiceRouter";
 import { reportRouter } from "./reportRouter";
 import { profileRouter } from "./profileRouter";
+import { addressRouter } from "./addressRouter";
 import { customerRouter } from "./customerRouter";
 import { deliveryZoneRouter } from "./deliveryZoneRouter";
 import { gstRouter } from "./gstRouter";
@@ -34,6 +35,7 @@ export const appRouter = createRouter({
   deliveryZone: deliveryZoneRouter,
   gst: gstRouter,
   shipping: shippingRouter,
+  address: addressRouter,
 });
 
 export type AppRouter = typeof appRouter;
