@@ -1,9 +1,11 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Link, useNavigate } from "react-router";
 import { toast } from "sonner";
 import { trpc } from "@/providers/trpc";
 import { citiesByState, indianStates } from "@/lib/freshflowData";
 import { formatCurrency } from "@/lib/i18n";
+import { isValidIndianMobileNumber } from "@/lib/utils";
+
 import { PageHeader } from "@/components/freshflow/PageHeader";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -20,6 +22,7 @@ export default function Checkout() {
   const navigate = useNavigate();
   const utils = trpc.useUtils();
   const cartQuery = trpc.cart.list.useQuery(undefined, { retry: false });
+  const profileQuery = trpc.profile.current.useQuery(undefined, { retry: false });
   const createOrder = trpc.order.create.useMutation({
     onSuccess: async (data) => {
       await Promise.all([
@@ -47,6 +50,21 @@ export default function Checkout() {
     confirmAddress: false,
     agreeTerms: false,
   });
+  const hasAutoFilled = useRef(false);
+  useEffect(() => {
+    if (profileQuery.data && !hasAutoFilled.current) {
+      setForm((prev) => ({
+        ...prev,
+        contactName: prev.contactName || profileQuery.data.name || "",
+        mobileNumber: prev.mobileNumber || profileQuery.data.phone || "",
+        address: prev.address || profileQuery.data.addressLine1 || "",
+        city: prev.city || profileQuery.data.city || "Hyderabad",
+        state: prev.state || profileQuery.data.state || "Telangana",
+      }));
+      hasAutoFilled.current = true;
+    }
+  }, [profileQuery.data]);
+
   const cities = useMemo(() => citiesByState[form.state] ?? [], [form.state]);
   const items = cartQuery.data?.items ?? [];
   const subtotal = cartQuery.data?.total ?? 0;
@@ -75,6 +93,10 @@ export default function Checkout() {
 
   function handleSubmit(event: React.FormEvent) {
     event.preventDefault();
+    if (!isValidIndianMobileNumber(form.mobileNumber)) {
+      toast.error("Please enter a valid 10-digit mobile number.");
+      return;
+    }
     createOrder.mutate({
       shippingAddressLine1: form.address,
       shippingCity: form.city,
