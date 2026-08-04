@@ -56,7 +56,7 @@ export default function Checkout() {
       setForm((prev) => ({
         ...prev,
         contactName: prev.contactName || profileQuery.data.name || "",
-        mobileNumber: prev.mobileNumber || profileQuery.data.phone || "",
+        mobileNumber: prev.mobileNumber || profileQuery.data.phone?.replace(/^\+91/, "") || "",
         address: prev.address || profileQuery.data.addressLine1 || "",
         city: prev.city || profileQuery.data.city || "Hyderabad",
         state: prev.state || profileQuery.data.state || "Telangana",
@@ -94,7 +94,7 @@ export default function Checkout() {
   function handleSubmit(event: React.FormEvent) {
     event.preventDefault();
     if (!isValidIndianMobileNumber(form.mobileNumber)) {
-      toast.error("Please enter a valid 10-digit mobile number.");
+      toast.error("Enter a valid 10-digit Indian mobile number.");
       return;
     }
     createOrder.mutate({
