@@ -47,11 +47,6 @@ type ProfileForm = {
   phone: string;
   dateOfBirth: string;
   gender: Gender | "";
-  addressLine1: string;
-  city: string;
-  state: string;
-  country: string;
-  postalCode: string;
   themePreference: ThemePreference;
 };
 
@@ -60,11 +55,6 @@ const emptyForm: ProfileForm = {
   phone: "",
   dateOfBirth: "",
   gender: "",
-  addressLine1: "",
-  city: "",
-  state: "",
-  country: "India",
-  postalCode: "",
   themePreference: "system",
 };
 
@@ -141,6 +131,13 @@ function AddressBook() {
       toast.error("Please fill in all required fields.");
       return;
     }
+
+    const trimmedAddress = form.addressLine1.trim();
+    if (trimmedAddress.length < 10 || trimmedAddress.length > 300) {
+      toast.error("Please enter a complete street address (minimum 10 characters).");
+      return;
+    }
+
     if (editingAddress) {
       updateMutation.mutate({ id: editingAddress.id, ...form });
     } else {
@@ -292,11 +289,6 @@ export default function Profile() {
       phone: profile.phone?.replace(/^\+91/, "") ?? "",
       dateOfBirth: profile.dateOfBirth ? new Date(profile.dateOfBirth).toISOString().slice(0, 10) : "",
       gender: (profile.gender as Gender | null) ?? "",
-      addressLine1: profile.addressLine1 ?? "",
-      city: profile.city ?? "",
-      state: profile.state ?? "",
-      country: profile.country ?? "India",
-      postalCode: profile.postalCode ?? "",
       themePreference: (profile.themePreference as ThemePreference | null) ?? "system",
     });
   }, [profile]);
@@ -386,11 +378,6 @@ export default function Profile() {
       phone: form.phone ? normalizeFrontendMobileNumber(form.phone) : null,
       dateOfBirth: form.dateOfBirth || null,
       gender: form.gender || null,
-      addressLine1: form.addressLine1.trim() || null,
-      city: form.city.trim() || null,
-      state: form.state || null,
-      country: form.country.trim() || null,
-      postalCode: form.postalCode.trim() || null,
       themePreference: form.themePreference,
     });
   }

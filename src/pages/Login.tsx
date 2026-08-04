@@ -94,6 +94,11 @@ export default function Login() {
     event.preventDefault();
     setError(null);
 
+    if (registrationMethod === "mobile" && !isValidIndianMobileNumber(registerForm.mobileNumber)) {
+      setError("Enter a valid 10-digit Indian mobile number.");
+      return;
+    }
+
     if (registerForm.password !== registerForm.confirmPassword) {
       setError("Password and confirm password must match.");
       return;
