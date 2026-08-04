@@ -5,9 +5,15 @@ export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs))
 }
 
+export function normalizeFrontendMobileNumber(input: string) {
+  const digits = input.replace(/\D/g, "");
+  if (!digits) return "";
+  const normalized = digits.length === 10 ? `+91${digits}` : (digits.startsWith("91") ? `+${digits}` : `+91${digits}`);
+  return normalized;
+}
+
 export function isValidIndianMobileNumber(input: string) {
   if (!input) return false;
-  const digits = input.replace(/\D/g, "");
-  const normalized = digits.startsWith("91") ? `+${digits}` : `+91${digits}`;
+  const normalized = normalizeFrontendMobileNumber(input);
   return /^\+91[6-9]\d{9}$/.test(normalized);
 }

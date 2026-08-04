@@ -4,7 +4,7 @@ import { useTheme } from "next-themes";
 import { trpc } from "@/providers/trpc";
 import { getAppRole, getRoleLabel } from "@/lib/roles";
 import { formatDate } from "@/lib/i18n";
-import { isValidIndianMobileNumber } from "@/lib/utils";
+import { isValidIndianMobileNumber, normalizeFrontendMobileNumber } from "@/lib/utils";
 import { indianStates } from "@/lib/freshflowData";
 import {
   AlertDialog,
@@ -86,7 +86,7 @@ export default function Profile() {
     if (!profile) return;
     setForm({
       name: profile.name ?? "",
-      phone: profile.phone ?? "",
+      phone: profile.phone?.replace(/^\+91/, "") ?? "",
       dateOfBirth: profile.dateOfBirth ? new Date(profile.dateOfBirth).toISOString().slice(0, 10) : "",
       gender: (profile.gender as Gender | null) ?? "",
       addressLine1: profile.addressLine1 ?? "",
@@ -175,12 +175,12 @@ export default function Profile() {
 
   function saveProfile() {
     if (form.phone && !isValidIndianMobileNumber(form.phone)) {
-      toast.error("Please enter a valid 10-digit mobile number.");
+      toast.error("Enter a valid 10-digit Indian mobile number.");
       return;
     }
     updateProfile.mutate({
       name: form.name.trim(),
-      phone: form.phone.trim() || null,
+      phone: form.phone ? normalizeFrontendMobileNumber(form.phone) : null,
       dateOfBirth: form.dateOfBirth || null,
       gender: form.gender || null,
       addressLine1: form.addressLine1.trim() || null,
@@ -274,7 +274,7 @@ export default function Profile() {
               <Input value={profile.email ?? ""} readOnly className="bg-muted/40" />
             </Field>
             <Field label="Mobile Number">
-              <Input value={form.phone} onChange={(event) => setForm({ ...form, phone: event.target.value })} placeholder="+91..." />
+              <Input value={form.phone} onChange={(event) => setForm({ ...form, phone: event.target.value })} placeholder="98765 43210" />
             </Field>
             <Field label="Date of Birth">
               <Input type="date" value={form.dateOfBirth} onChange={(event) => setForm({ ...form, dateOfBirth: event.target.value })} />

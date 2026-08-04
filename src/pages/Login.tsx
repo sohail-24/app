@@ -3,7 +3,7 @@ import type { FormEvent } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router";
 import { Loader2, Lock, Mail, Phone, Sprout } from "lucide-react";
 import { trpc } from "@/providers/trpc";
-import { isValidIndianMobileNumber } from "@/lib/utils";
+import { isValidIndianMobileNumber, normalizeFrontendMobileNumber } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -62,12 +62,12 @@ export default function Login() {
     event.preventDefault();
     setError(null);
     if (!isValidIndianMobileNumber(mobileForm.mobileNumber)) {
-      setError("Please enter a valid 10-digit mobile number.");
+      setError("Enter a valid 10-digit Indian mobile number.");
       return;
     }
     try {
       const result = await loginMobile.mutateAsync({
-        mobileNumber: mobileForm.mobileNumber,
+        mobileNumber: normalizeFrontendMobileNumber(mobileForm.mobileNumber),
         password: mobileForm.password,
       });
       await finishLogin(result.user);
@@ -107,7 +107,7 @@ export default function Login() {
     try {
       const result = await register.mutateAsync({
         method: registrationMethod,
-        mobileNumber: registrationMethod === "mobile" ? registerForm.mobileNumber : undefined,
+        mobileNumber: registrationMethod === "mobile" ? normalizeFrontendMobileNumber(registerForm.mobileNumber) : undefined,
         email: registrationMethod === "email" ? registerForm.email : undefined,
         password: registerForm.password,
       });
