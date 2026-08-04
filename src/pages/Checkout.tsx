@@ -115,10 +115,26 @@ export default function Checkout() {
     );
   }
 
+  if (!addressQuery.isLoading && addressQuery.data?.length === 0) {
+    return (
+      <div className="mx-auto max-w-md py-16 text-center">
+        <MapPin className="mx-auto mb-4 h-12 w-12 text-muted-foreground/40" />
+        <h2 className="mb-2 text-xl font-semibold">Address required</h2>
+        <p className="mb-6 text-muted-foreground">Please complete your Address Book first to place an order.</p>
+        <Link to="/profile"><Button>Add Delivery Address</Button></Link>
+      </div>
+    );
+  }
+
   function handleSubmit(event: React.FormEvent) {
     event.preventDefault();
     if (!isValidIndianMobileNumber(form.mobileNumber)) {
       toast.error("Enter a valid 10-digit Indian mobile number.");
+      return;
+    }
+    const trimmedAddress = form.address.trim();
+    if (trimmedAddress.length < 10) {
+      toast.error("Please enter your complete house/flat number and street address.");
       return;
     }
     createOrder.mutate({
@@ -205,7 +221,7 @@ export default function Checkout() {
               </div>
             </div>
             <div className="space-y-2">
-              <Label htmlFor="address">Delivery Address</Label>
+              <Label htmlFor="address">House / Flat No. & Street Address *</Label>
               <Textarea id="address" value={form.address} onChange={(event) => setForm({ ...form, address: event.target.value })} required />
             </div>
             <div className="space-y-2">
