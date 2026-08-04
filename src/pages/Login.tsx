@@ -3,6 +3,7 @@ import type { FormEvent } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router";
 import { Loader2, Lock, Mail, Phone, Sprout } from "lucide-react";
 import { trpc } from "@/providers/trpc";
+import { isValidIndianMobileNumber } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -24,11 +25,11 @@ export default function Login() {
   const loginEmail = trpc.auth.loginEmail.useMutation();
   const register = trpc.auth.register.useMutation();
 
-  const [mobileForm, setMobileForm] = useState({ mobileNumber: "+91", password: "", remember: false });
+  const [mobileForm, setMobileForm] = useState({ mobileNumber: "", password: "", remember: false });
   const [emailForm, setEmailForm] = useState({ email: "", password: "", remember: false });
   const [registrationMethod, setRegistrationMethod] = useState<"mobile" | "email">("mobile");
   const [registerForm, setRegisterForm] = useState({
-    mobileNumber: "+91",
+    mobileNumber: "",
     email: "",
     password: "",
     confirmPassword: "",
@@ -60,6 +61,10 @@ export default function Login() {
   async function handleMobileLogin(event: FormEvent) {
     event.preventDefault();
     setError(null);
+    if (!isValidIndianMobileNumber(mobileForm.mobileNumber)) {
+      setError("Please enter a valid 10-digit mobile number.");
+      return;
+    }
     try {
       const result = await loginMobile.mutateAsync({
         mobileNumber: mobileForm.mobileNumber,
@@ -142,7 +147,7 @@ export default function Login() {
                     id="mobileNumber"
                     value={mobileForm.mobileNumber}
                     onChange={(event) => setMobileForm({ ...mobileForm, mobileNumber: event.target.value })}
-                    placeholder="+91 98765 43210"
+                    placeholder="98765 43210"
                     required
                   />
                 </FieldIcon>

@@ -4,6 +4,7 @@ import { useTheme } from "next-themes";
 import { trpc } from "@/providers/trpc";
 import { getAppRole, getRoleLabel } from "@/lib/roles";
 import { formatDate } from "@/lib/i18n";
+import { isValidIndianMobileNumber } from "@/lib/utils";
 import { indianStates } from "@/lib/freshflowData";
 import {
   AlertDialog,
@@ -173,6 +174,10 @@ export default function Profile() {
     .toUpperCase();
 
   function saveProfile() {
+    if (form.phone && !isValidIndianMobileNumber(form.phone)) {
+      toast.error("Please enter a valid 10-digit mobile number.");
+      return;
+    }
     updateProfile.mutate({
       name: form.name.trim(),
       phone: form.phone.trim() || null,
