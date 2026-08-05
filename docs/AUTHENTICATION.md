@@ -34,6 +34,15 @@ The authentication system is designed so future features such as Email Verificat
 
 ---
 
+# Mobile Number Handling
+
+- Mobile numbers are strictly stored in the database natively in E.164 format (e.g. `+91XXXXXXXXXX`).
+- In the frontend UI, mobile numbers are strictly inputted and presented as 10-digit strings without the `+91` prefix.
+- The client-side form validation checks for exactly 10 digits.
+- Client-side logic strips the `+91` prefix from API responses before displaying it, and normalizes inputs to `+91XXXXXXXXXX` before submitting mutations to the backend.
+
+---
+
 # Goals
 
 Authentication should provide:

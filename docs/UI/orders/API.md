@@ -1,4 +1,3 @@
-````markdown
 # Orders Module API
 
 Version: 1.0

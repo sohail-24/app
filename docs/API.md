@@ -43,16 +43,22 @@ Business logic is organised into independent routers.
 Typical router structure:
 
 ```text
+address
 auth
-company
+cart
 category
-product
+company
+customer
+deliveryZone
+gst
 inventory
-warehouse
-order
 invoice
+order
+product
+profile
 report
-userProfile
+shipping
+warehouse
 ```
 
 Each router owns its own business operations.
@@ -66,14 +72,15 @@ Each business module maintains its own API documentation.
 Example:
 
 ```text
-docs/UI/company/API.md
-docs/UI/products/API.md
 docs/UI/categories/API.md
+docs/UI/company/API.md
 docs/UI/inventory/API.md
-docs/UI/warehouse/API.md
-docs/UI/orders/API.md
 docs/UI/invoices/API.md
+docs/UI/orders/API.md
+docs/UI/products/API.md
 docs/UI/reports/API.md
+docs/UI/user-profile/API.md
+docs/UI/warehouse/API.md
 ```
 
 Project-level API standards belong only in this document.
