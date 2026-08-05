@@ -83,7 +83,7 @@ Foundation → Business Platform → Platform Engineering → DevOps → Cloud �
 ---
 
 # Phase 1
-Docker & Docker Compose
+- [x] Docker & Docker Compose
 
 # Phase 2
 Deploy to a single server / VPS

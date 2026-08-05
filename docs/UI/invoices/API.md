@@ -1,4 +1,3 @@
-````markdown id="48735"
 # Invoice Module API
 
 Version: 1.0

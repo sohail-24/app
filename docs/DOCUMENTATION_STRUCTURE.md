@@ -311,7 +311,7 @@ UI pages define:
 Examples:
 
 * Home Marketplace
-* Product Catalog
+* Product Details
 * Checkout
 * Cart
 * Dashboards

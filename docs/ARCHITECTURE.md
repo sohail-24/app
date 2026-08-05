@@ -214,6 +214,29 @@ Buyers must never see administrative controls. The UI hides add/edit/delete prod
 | Validation | Zod |
 | Build | Vite + esbuild |
 | Testing/Checks | TypeScript build check, Vitest config present |
+| Infrastructure | Docker Compose, Nginx, Node 22-slim, PostgreSQL 15-alpine |
+
+## Docker & Nginx Infrastructure
+
+FreshFlow is containerized following a Platform Engineering Phase 1 approach. Production deployment is orchestrated using Docker Compose (`docker-compose.yml`).
+
+### Container Flow
+
+- **Nginx Container:** Runs `nginx:stable` on port `80`. It acts as the single public entry point for the application. It statically serves the React SPA frontend and reverse-proxies all `/api/*` and WebSocket upgrades to the internal Node backend. It provides compression (gzip), security headers, and rate-limiting. Health checks utilize `GET /nginx-health`.
+- **App Container:** Runs the Node backend (`node:22-slim`) on internal port `3000`. It executes the bundled Hono server (`dist/boot.js`). Health checks utilize `GET /health` internally.
+- **Database Container:** Runs `postgres:15-alpine` on internal port `5432`. Data is persisted using the `pgdata` volume.
+
+### Volumes and Networks
+
+- **Networks:** Services communicate securely over the `freshflow-network` bridge.
+- **Volumes:** `pgdata` stores PostgreSQL database state. `product_uploads` stores uploaded product images at `/app/uploads`.
+
+### Startup Sequence
+
+1. `docker compose up --build` brings up the Database, App, and Nginx containers.
+2. The Node App waits for the Postgres container health check (`pg_isready`).
+3. The Node App starts, running Drizzle migrations programmatically in `api/boot.ts` before listening for requests.
+4. Nginx waits for the App container health check before serving traffic.
 
 ## Current Features
 
