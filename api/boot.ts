@@ -130,7 +130,21 @@ if (env.isProduction) {
   }
 
   const port = parseInt(process.env.PORT || "3000");
-  serve({ fetch: app.fetch, port }, () => {
+  const server = serve({ fetch: app.fetch, port }, () => {
     console.log(`Server running on http://localhost:${port}/`);
   });
+
+  const shutdown = async (signal: string) => {
+    console.log(`\nReceived ${signal}. Shutting down gracefully...`);
+    // Close the HTTP server
+    server.close();
+
+    // Attempt to close DB connection if possible, usually handled by process exit
+    // but better to allow ongoing requests to finish
+    console.log("Closed HTTP server.");
+    process.exit(0);
+  };
+
+  process.on("SIGINT", () => shutdown("SIGINT"));
+  process.on("SIGTERM", () => shutdown("SIGTERM"));
 }
