@@ -28,7 +28,6 @@ async function seed() {
       type: "supplier" as const,
       description: "Premium fruit warehouse supplier.",
       email: "contact@amfruits-warehouse.com",
-      phone: "+1 (555) 123-4567",
       addressLine1: "123 Fruit Ave",
       city: "Los Angeles",
       state: "CA",

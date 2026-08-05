@@ -28,6 +28,14 @@ import { findAllInventory, updateInventory } from "./queries/inventory";
 const unitTypeSchema = z.enum(["kg", "lb", "case", "pallet", "each", "bunch", "box", "bag"]);
 const gradeSchema = z.enum(["premium", "grade_a", "grade_b", "standard"]);
 const statusSchema = z.enum(["draft", "active", "archived"]);
+const productImageUrlSchema = z
+  .string()
+  .trim()
+  .max(2048)
+  .refine(
+    (value) => value.startsWith("/api/uploads/products/") || /^https?:\/\//i.test(value),
+    "Product images must be uploaded files or HTTP(S) URLs.",
+  );
 
 const productMutationSchema = z.object({
   name: z.string().trim().min(2, "Product name is required."),
@@ -53,7 +61,7 @@ const productMutationSchema = z.object({
   minimumOrderQuantity: z.number().int().positive().default(1),
   grade: gradeSchema.default("grade_a"),
   organic: z.boolean().default(false),
-  images: z.array(z.string()).default([]),
+  images: z.array(productImageUrlSchema).default([]),
   tags: z.array(z.string().trim().min(1)).default([]),
 });
 

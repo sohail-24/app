@@ -59,11 +59,27 @@ type ImagePreview = {
   url: string;
 };
 
+async function uploadProductImage(file: File): Promise<string> {
+  const formData = new FormData();
+  formData.append("image", file);
+
+  const response = await fetch("/api/uploads/products", {
+    method: "POST",
+    body: formData,
+  });
+  const payload = await response.json().catch(() => ({})) as { error?: string; url?: string };
+  if (!response.ok || !payload.url) {
+    throw new Error(payload.error || `Could not upload ${file.name}.`);
+  }
+
+  return payload.url;
+}
+
 export default function AddProduct() {
   const navigate = useNavigate();
   const inputRef = useRef<HTMLInputElement | null>(null);
-  const imageUrlsRef = useRef<string[]>([]);
   const [isDragging, setIsDragging] = useState(false);
+  const [isUploadingImages, setIsUploadingImages] = useState(false);
   const [images, setImages] = useState<ImagePreview[]>([]);
   const [primaryImageId, setPrimaryImageId] = useState<string | null>(null);
   const [attemptedSubmit, setAttemptedSubmit] = useState(false);
@@ -133,12 +149,6 @@ export default function AddProduct() {
   const isFormValid = Object.values(errors).every((error) => !error);
 
   useEffect(() => {
-    return () => {
-      imageUrlsRef.current.forEach((url) => URL.revokeObjectURL(url));
-    };
-  }, []);
-
-  useEffect(() => {
     if (!form.supplierId && suppliers[0]) {
       setForm((current) => ({ ...current, supplierId: String(suppliers[0].id) }));
     }
@@ -148,27 +158,37 @@ export default function AddProduct() {
     setForm((current) => ({ ...current, [field]: value }));
   };
 
-  const addFiles = (files: FileList | File[]) => {
-    const nextImages = Array.from(files)
+  const addFiles = async (files: FileList | File[]) => {
+    const selectedFiles = Array.from(files)
       .filter((file) => file.type.startsWith("image/"))
-      .map((file) => ({
-        id: `${file.name}-${file.lastModified}-${crypto.randomUUID()}`,
-        name: file.name,
-        size: file.size,
-        url: URL.createObjectURL(file),
-      }));
-    imageUrlsRef.current.push(...nextImages.map((image) => image.url));
-    setImages((current) => {
-      const merged = [...current, ...nextImages].slice(0, 8);
-      if (!primaryImageId && merged[0]) setPrimaryImageId(merged[0].id);
-      return merged;
-    });
+      .slice(0, Math.max(0, 8 - images.length));
+    if (!selectedFiles.length) return;
+
+    setIsUploadingImages(true);
+    try {
+      const nextImages = await Promise.all(
+        selectedFiles.map(async (file) => ({
+          id: `${file.name}-${file.lastModified}-${crypto.randomUUID()}`,
+          name: file.name,
+          size: file.size,
+          url: await uploadProductImage(file),
+        })),
+      );
+
+      setImages((current) => {
+        const merged = [...current, ...nextImages].slice(0, 8);
+        if (!primaryImageId && merged[0]) setPrimaryImageId(merged[0].id);
+        return merged;
+      });
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Could not upload product images.");
+    } finally {
+      setIsUploadingImages(false);
+    }
   };
 
   const removeImage = (id: string) => {
     setImages((current) => {
-      const target = current.find((image) => image.id === id);
-      if (target) URL.revokeObjectURL(target.url);
       const next = current.filter((image) => image.id !== id);
       if (primaryImageId === id) setPrimaryImageId(next[0]?.id ?? null);
       return next;
@@ -190,6 +210,10 @@ export default function AddProduct() {
 
   const saveProduct = (status: "draft" | "active") => {
     setAttemptedSubmit(true);
+    if (isUploadingImages) {
+      toast.error("Wait for product images to finish uploading.");
+      return;
+    }
     if (!isFormValid) {
       toast.error("Complete the required product fields before saving.");
       return;

@@ -51,10 +51,14 @@ export default function Login() {
     clearGuestCart();
   }
 
-  async function finishLogin(user?: { role?: string | null; email?: string | null }) {
+  async function finishLogin() {
     await syncGuestCart();
-    await utils.invalidate();
-    const defaultDestination = user?.role === "admin" || isOwner(user) ? "/dashboard" : "/";
+    await utils.auth.me.invalidate();
+    const user = await utils.auth.me.fetch();
+    if (!user) {
+      throw new Error("Session was not established. Please try again.");
+    }
+    const defaultDestination = user.role === "admin" || isOwner(user) ? "/dashboard" : "/";
     navigate(requestedReturnTo || defaultDestination, { replace: true });
   }
 
@@ -66,11 +70,11 @@ export default function Login() {
       return;
     }
     try {
-      const result = await loginMobile.mutateAsync({
+      await loginMobile.mutateAsync({
         mobileNumber: normalizeFrontendMobileNumber(mobileForm.mobileNumber),
         password: mobileForm.password,
       });
-      await finishLogin(result.user);
+      await finishLogin();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Unable to sign in.");
     }
@@ -80,11 +84,11 @@ export default function Login() {
     event.preventDefault();
     setError(null);
     try {
-      const result = await loginEmail.mutateAsync({
+      await loginEmail.mutateAsync({
         email: emailForm.email,
         password: emailForm.password,
       });
-      await finishLogin(result.user);
+      await finishLogin();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Unable to sign in.");
     }
@@ -110,13 +114,13 @@ export default function Login() {
     }
 
     try {
-      const result = await register.mutateAsync({
+      await register.mutateAsync({
         method: registrationMethod,
         mobileNumber: registrationMethod === "mobile" ? normalizeFrontendMobileNumber(registerForm.mobileNumber) : undefined,
         email: registrationMethod === "email" ? registerForm.email : undefined,
         password: registerForm.password,
       });
-      await finishLogin(result.user);
+      await finishLogin();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Unable to create account.");
     }

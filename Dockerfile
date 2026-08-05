@@ -37,7 +37,8 @@ COPY --from=builder /app/drizzle.config.ts ./
 
 # Create a non-root user for security
 RUN groupadd -r appgroup && useradd -r -g appgroup appuser
-RUN chown -R appuser:appgroup /app
+RUN mkdir -p /app/uploads/products \
+    && chown -R appuser:appgroup /app
 USER appuser
 
 # Expose port (Internal backend port)

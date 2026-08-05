@@ -5,6 +5,7 @@ import {
   inventory,
   orderItems,
   orders,
+  users,
   type InsertOrder,
   type InsertOrderItem,
 } from "@db/schema";
@@ -167,9 +168,10 @@ export async function findOrderById(orderId: number) {
 
   if (!order) return null;
 
-  const [buyer, supplier] = await Promise.all([
+  const [buyer, supplier, platformAdmin] = await Promise.all([
     db.query.companies.findFirst({ where: eq(companies.id, order.buyerId) }),
     db.query.companies.findFirst({ where: eq(companies.id, order.supplierId) }),
+    db.query.users.findFirst({ where: eq(users.role, "admin") }),
   ]);
 
   return {
@@ -183,7 +185,7 @@ export async function findOrderById(orderId: number) {
     buyerPostalCode: buyer?.postalCode ?? null,
     buyerCountry: buyer?.country ?? null,
     supplierName: supplier?.name ?? null,
-    supplierPhone: supplier?.phone ?? null,
+    supplierPhone: platformAdmin?.phone ?? null,
     supplierAddressLine1: supplier?.addressLine1 ?? null,
     supplierAddressLine2: supplier?.addressLine2 ?? null,
     supplierCity: supplier?.city ?? null,
