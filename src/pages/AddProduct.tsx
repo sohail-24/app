@@ -64,7 +64,7 @@ async function uploadProductImage(file: File): Promise<string> {
   const formData = new FormData();
   formData.append("image", file);
 
-  const response = await fetch("/api/uploads/products", {
+  const response = await fetch("/api/products/upload", {
     method: "POST",
     body: formData,
   });
