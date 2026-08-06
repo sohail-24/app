@@ -14,7 +14,7 @@ import { randomUUID } from "node:crypto";
 import { basename, extname, join, resolve } from "node:path";
 
 const app = new Hono<{ Bindings: HttpBindings }>();
-const productUploadsDirectory = resolve(process.cwd(), "uploads");
+const productUploadsDirectory = resolve(process.cwd(), "uploads/products");
 const maxProductImageBytes = 5 * 1024 * 1024;
 const imageExtensions: Record<string, string> = {
   "image/jpeg": ".jpg",
@@ -61,7 +61,7 @@ app.get("/api/uploads/:filename", async (c) => {
   }
 });
 
-app.post("/api/uploads/products", async (c) => {
+app.post("/api/products/upload", async (c) => {
   const responseHeaders = new Headers();
   let user;
   try {
