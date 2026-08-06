@@ -33,7 +33,7 @@ const productImageUrlSchema = z
   .trim()
   .max(2048)
   .refine(
-    (value) => value.startsWith("/api/uploads/products/") || /^https?:\/\//i.test(value),
+    (value) => value.startsWith("/api/uploads/") || /^https?:\/\//i.test(value),
     "Product images must be uploaded files or HTTP(S) URLs.",
   );
 

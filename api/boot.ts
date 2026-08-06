@@ -14,7 +14,7 @@ import { randomUUID } from "node:crypto";
 import { basename, extname, join, resolve } from "node:path";
 
 const app = new Hono<{ Bindings: HttpBindings }>();
-const productUploadsDirectory = resolve(process.cwd(), "uploads/products");
+const productUploadsDirectory = resolve(process.cwd(), "uploads");
 const maxProductImageBytes = 5 * 1024 * 1024;
 const imageExtensions: Record<string, string> = {
   "image/jpeg": ".jpg",
@@ -42,7 +42,7 @@ app.get("/health", (c) => {
   });
 });
 
-app.get("/api/uploads/products/:filename", async (c) => {
+app.get("/api/uploads/:filename", async (c) => {
   const filename = c.req.param("filename");
   if (filename !== basename(filename) || !imageExtensions[contentTypeFor(filename)]) {
     return c.json({ error: "Not Found" }, 404);
@@ -89,10 +89,10 @@ app.post("/api/uploads/products", async (c) => {
   }
 
   await mkdir(productUploadsDirectory, { recursive: true });
-  const filename = `${randomUUID()}${extension}`;
+  const filename = `product-${randomUUID()}${extension}`;
   await writeFile(join(productUploadsDirectory, filename), Buffer.from(await image.arrayBuffer()));
   for (const [name, value] of responseHeaders) c.header(name, value, { append: true });
-  return c.json({ url: `/api/uploads/products/${filename}` }, 201);
+  return c.json({ url: `/api/uploads/${filename}` }, 201);
 });
 
 function contentTypeFor(filename: string) {

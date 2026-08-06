@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Link, useNavigate } from "react-router";
+import { nanoid } from "nanoid";
 import { toast } from "sonner";
 import { trpc } from "@/providers/trpc";
 import { formatCurrency, toNumber } from "@/lib/i18n";
@@ -168,7 +169,7 @@ export default function AddProduct() {
     try {
       const nextImages = await Promise.all(
         selectedFiles.map(async (file) => ({
-          id: `${file.name}-${file.lastModified}-${crypto.randomUUID()}`,
+          id: `${file.name}-${file.lastModified}-${nanoid()}`,
           name: file.name,
           size: file.size,
           url: await uploadProductImage(file),
