@@ -1,5 +1,5 @@
 import { getDb } from "./connection";
-import { inventory, products, companies, type InsertInventory } from "@db/schema";
+import { inventory, products, companies, warehouseStockMovements, type InsertInventory } from "@db/schema";
 import { eq, and, sql, asc } from "drizzle-orm";
 import { TRPCError } from "@trpc/server";
 
@@ -217,6 +217,14 @@ export async function createInventoryRecord(data: InsertInventory) {
     .values(data)
     .returning({ id: inventory.id });
   return result[0].id;
+}
+
+export async function deleteInventoryRecord(id: number) {
+  const db = getDb();
+  await db.transaction(async (tx) => {
+    await tx.delete(warehouseStockMovements).where(eq(warehouseStockMovements.inventoryId, id));
+    await tx.delete(inventory).where(eq(inventory.id, id));
+  });
 }
 
 export async function getInventoryStats(supplierId?: number) {
