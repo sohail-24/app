@@ -8,6 +8,7 @@ import {
   findInventoryBySupplier,
   updateInventory,
   getInventoryStats,
+  deleteInventoryRecord,
 } from "./queries/inventory";
 import { findCompanyById } from "./queries/companies";
 
@@ -335,7 +336,7 @@ export const inventoryRouter = createRouter({
     .input(z.object({ id: z.number().int().positive() }))
     .mutation(async ({ input }) => {
       await getRequiredInventoryRecord(input.id);
-      await updateInventory(input.id, { isActive: false });
+      await deleteInventoryRecord(input.id);
       return { success: true };
     }),
 
