@@ -14,6 +14,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Drawer, DrawerContent, DrawerTrigger, DrawerTitle, DrawerHeader } from "@/components/ui/drawer";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
   ArrowLeft,
@@ -110,7 +111,7 @@ function BuyerMarketplace() {
   }
 
   return (
-    <div className="mx-auto flex w-full max-w-[1500px] flex-col gap-4">
+    <div className="mx-auto flex w-full max-w-[1500px] flex-col gap-3 md:gap-4 pb-16 md:pb-0">
       <section className="rounded-lg border bg-card shadow-sm">
         <div className="flex flex-col gap-3 border-b p-4 lg:flex-row lg:items-center lg:justify-between">
           <Link to="/dashboard" className="flex items-center gap-2 text-lg font-semibold">
@@ -121,7 +122,7 @@ function BuyerMarketplace() {
             <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
             <Input value={search} onChange={(event) => setSearch(event.target.value)} className="pl-9" placeholder="Search products..." />
           </div>
-          <div className="flex gap-2">
+          <div className="hidden lg:flex gap-2">
             <Button variant="outline" size="icon"><ShoppingCart className="h-4 w-4" /></Button>
             <Button variant="outline" size="icon"><Star className="h-4 w-4" /></Button>
           </div>
@@ -150,7 +151,7 @@ function BuyerMarketplace() {
       </section>
 
       <div className="grid gap-4 lg:grid-cols-[240px_minmax(0,1fr)]">
-        <aside className="rounded-lg border bg-card p-4 shadow-sm">
+        <aside className="hidden lg:block rounded-lg border bg-card p-4 shadow-sm">
           <h2 className="mb-4 text-sm font-semibold uppercase text-muted-foreground">Filters</h2>
           <div className="space-y-6">
             <div className="space-y-3">
@@ -197,7 +198,7 @@ function BuyerMarketplace() {
         <main className="min-w-0 space-y-4">
           <Card>
             <CardContent className="flex flex-col gap-3 p-4 sm:flex-row sm:items-center sm:justify-between">
-              <div className="flex flex-wrap gap-2">
+              <div className="hidden md:flex flex-wrap gap-2">
                 <Select value={sort} onValueChange={setSort}>
                   <SelectTrigger className="w-36"><SelectValue /></SelectTrigger>
                   <SelectContent>
@@ -214,11 +215,11 @@ function BuyerMarketplace() {
           </Card>
 
           {productsQuery.isLoading ? (
-            <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+            <div className="grid grid-cols-2 gap-2 sm:gap-4 sm:grid-cols-2 xl:grid-cols-4">
               {Array.from({ length: 8 }).map((_, index) => <Skeleton key={index} className="h-80" />)}
             </div>
           ) : (
-            <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+            <div className="grid grid-cols-2 gap-2 sm:gap-4 sm:grid-cols-2 xl:grid-cols-4">
               {products.map((product) => (
                 <ProductCard key={product.id} product={product} onAdd={(quantity) => addProductToCart(product, quantity)} pending={addToCart.isPending} />
               ))}
@@ -238,9 +239,71 @@ function BuyerMarketplace() {
           )}
         </main>
       </div>
+      {/* Mobile Bottom Filter Bar */}
+      <div className="fixed bottom-16 left-0 right-0 z-40 flex h-14 items-center justify-center gap-4 border-t bg-card px-4 shadow-[0_-4px_20px_-2px_rgba(0,0,0,0.1)] lg:hidden">
+        <Drawer>
+          <DrawerTrigger asChild>
+            <Button variant="outline" className="flex-1">
+              <SlidersHorizontal className="mr-2 h-4 w-4" />
+              Filters
+            </Button>
+          </DrawerTrigger>
+          <DrawerContent>
+            <DrawerHeader>
+              <DrawerTitle>Filters</DrawerTitle>
+            </DrawerHeader>
+            <div className="p-4 space-y-6">
+              <div className="space-y-3">
+                <Label>Category</Label>
+                <Select value={categoryId} onValueChange={setCategoryId}>
+                  <SelectTrigger><SelectValue placeholder="Category" /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All Categories</SelectItem>
+                    {activeCategories.map((category) => (
+                      <SelectItem key={category.id} value={String(category.id)}>{category.name}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <FilterCheck label="In Stock" checked />
+              <div className="space-y-2">
+                <Label>Rating</Label>
+                <div className="text-sm">★★★★★</div>
+                <div className="text-sm">★★★★☆</div>
+              </div>
+              <Button variant="outline" className="w-full">Reset Filters</Button>
+            </div>
+          </DrawerContent>
+        </Drawer>
+        <div className="h-6 w-px bg-border" />
+        <Drawer>
+          <DrawerTrigger asChild>
+            <Button variant="outline" className="flex-1">
+              <Star className="mr-2 h-4 w-4" />
+              Sort
+            </Button>
+          </DrawerTrigger>
+          <DrawerContent>
+            <DrawerHeader>
+              <DrawerTitle>Sort By</DrawerTitle>
+            </DrawerHeader>
+            <div className="p-4 space-y-3">
+               <Select value={sort} onValueChange={setSort}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="newest">Newest</SelectItem>
+                    <SelectItem value="price">Price</SelectItem>
+                    <SelectItem value="rating">Rating</SelectItem>
+                  </SelectContent>
+                </Select>
+            </div>
+          </DrawerContent>
+        </Drawer>
+      </div>
     </div>
   );
 }
+
 
 function ProductCard({ product, onAdd, pending }: { product: CatalogProduct; onAdd: (quantity: number) => void; pending?: boolean }) {
   const price = toNumber(product.unitPrice);
@@ -252,50 +315,53 @@ function ProductCard({ product, onAdd, pending }: { product: CatalogProduct; onA
   const [imageFailed, setImageFailed] = useState(false);
 
   return (
-    <Card className="overflow-hidden rounded-xl shadow-sm hover:shadow-premium hover:-translate-y-1 transition-all duration-300 border-border">
+    <Card className="overflow-hidden rounded-xl shadow-sm hover:shadow-premium sm:hover:-translate-y-1 transition-all duration-300 border-border">
       <Link to={`/products/${product.slug}`} className="block relative">
-        <div className="flex aspect-square items-center justify-center bg-muted text-lg font-semibold text-muted-foreground">
-          {product.image && !imageFailed ? <img src={product.image} alt={product.name} className="h-full w-full object-cover" onError={() => setImageFailed(true)} /> : <ImageIcon className="h-9 w-9" />}
+        <div className="flex aspect-[4/3] sm:aspect-square items-center justify-center bg-muted text-lg font-semibold text-muted-foreground">
+          {product.image && !imageFailed ? <img src={product.image} alt={product.name} className="h-full w-full object-cover" onError={() => setImageFailed(true)} /> : <ImageIcon className="h-8 w-8 sm:h-9 sm:w-9" />}
         </div>
       </Link>
-      <CardContent className="space-y-3 p-4 text-sm">
-        <div>
-          <Link to={`/products/${product.slug}`} className="text-base font-semibold hover:text-primary">{product.name}</Link>
-          <p className="text-xs text-muted-foreground">{product.supplierName ?? "Supplier"}</p>
+      <CardContent className="space-y-2 sm:space-y-3 p-3 sm:p-4 text-xs sm:text-sm">
+        <div className="min-h-[48px] sm:min-h-[62px]">
+          <Link to={`/products/${product.slug}`} className="text-sm sm:text-base font-semibold hover:text-primary line-clamp-2">{product.name}</Link>
+          <p className="mt-0.5 sm:mt-1 truncate text-[10px] sm:text-xs text-muted-foreground">{product.supplierName ?? "Supplier"}</p>
         </div>
-        <div className="grid gap-1 text-muted-foreground">
-          <p><span className="font-medium text-foreground">{formatCurrency(price)}</span> / {unitLabels[unit] ?? unit}</p>
-          <p>Stock {product.stock ?? "Not set"}</p>
-          <p>MOQ {moq} {unit}</p>
-          {product.rating && <p>Rating {product.rating}</p>}
+        <div className="grid gap-0.5 sm:gap-1 text-[10px] sm:text-xs text-muted-foreground">
+          <p><span className="text-sm sm:text-base font-bold text-primary">{formatCurrency(price)}</span> / {unitLabels[unit] ?? unit}</p>
+          <div className="grid grid-cols-2 gap-x-2">
+            <span>Stock: {product.stock ?? "Not set"}</span>
+            <span>MOQ: {moq} {unit}</span>
+          </div>
+          {product.rating && <p>Rating: ★ {product.rating}</p>}
         </div>
-        <div className="flex items-center justify-between rounded-lg border bg-muted/50 p-2">
-          <Button variant="outline" size="icon" className="h-10 w-10 bg-card rounded-md shadow-sm transition-transform active:scale-95" onClick={() => setQuantity(Math.max(moq, quantity - 1))} disabled={quantity <= moq || isOutOfStock}>
-            <Minus className="h-4 w-4" />
+        <div className="flex items-center justify-between rounded-lg border bg-muted/50 p-1 sm:p-2">
+          <Button variant="outline" size="icon" className="h-7 w-7 sm:h-10 sm:w-10 bg-card rounded-md shadow-sm transition-transform active:scale-95" onClick={() => setQuantity(Math.max(moq, quantity - 1))} disabled={quantity <= moq || isOutOfStock}>
+            <Minus className="h-3 w-3 sm:h-4 sm:w-4" />
           </Button>
-          <span className="min-w-20 text-center font-semibold">{quantity} {unit}</span>
-          <Button variant="outline" size="icon" className="h-10 w-10 bg-card rounded-md shadow-sm transition-transform active:scale-95" onClick={() => {
+          <span className="min-w-12 sm:min-w-20 text-center font-semibold text-xs sm:text-sm">{quantity} {unit}</span>
+          <Button variant="outline" size="icon" className="h-7 w-7 sm:h-10 sm:w-10 bg-card rounded-md shadow-sm transition-transform active:scale-95" onClick={() => {
             if (quantity >= stock) {
               toast.error(`Only ${stock} available.`);
             } else {
               setQuantity(quantity + 1);
             }
           }} disabled={isOutOfStock}>
-            <Plus className="h-4 w-4" />
+            <Plus className="h-3 w-3 sm:h-4 sm:w-4" />
           </Button>
         </div>
-        <p className="font-semibold">Total {formatCurrency(price * quantity)}</p>
-        <div className="grid gap-2">
-          <Link to={`/products/${product.slug}`}><Button variant="outline" className="w-full"><Eye className="mr-2 h-4 w-4" />View Details</Button></Link>
-          <Button onClick={() => onAdd(quantity)} disabled={pending || isOutOfStock} className="w-full bg-emerald-600 hover:bg-emerald-700">
-            {isOutOfStock ? "Out of Stock" : "Add to Cart"}
+        <div className="flex items-center justify-between sm:block">
+          <p className="font-semibold text-xs sm:text-sm hidden sm:block">Total: {formatCurrency(price * quantity)}</p>
+        </div>
+        <div className="grid gap-2 mt-1 sm:mt-0">
+          <Link to={`/products/${product.slug}`} className="hidden sm:block"><Button variant="outline" className="w-full"><Eye className="mr-2 h-4 w-4" />View Details</Button></Link>
+          <Button onClick={() => onAdd(quantity)} disabled={pending || isOutOfStock} size="sm" className="w-full h-8 sm:h-9 bg-emerald-600 hover:bg-emerald-700 text-xs sm:text-sm">
+            {isOutOfStock ? "Out of Stock" : "Add"}
           </Button>
         </div>
       </CardContent>
     </Card>
   );
 }
-
 function OwnerProductCatalog() {
   const [search, setSearch] = useState("");
   const productsQuery = trpc.product.list.useQuery({ search: search || undefined, sortBy: "newest" }, { retry: false });

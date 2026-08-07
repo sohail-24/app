@@ -1,51 +1,42 @@
-1. **Analyze Current Implementation vs ASCII Design:**
-   - **ASCII Design Requirements:**
-     - Desktop: Header with Logo, Search, Login/Profile, Cart. Top navigation bar for categories (All Products, Fruits, Vegetables, etc). Business Information Strip (Same Day Delivery, etc). "Today's Fresh Deals" block with Product Grid. "Browse by Categories" block. "ALL Products" block. "Load More Products" button. Footer.
-     - Tablet: Similar, categories horizontal scroll. Business Info Strip. Deals grid. Browse Categories. Recently Added Products. Footer.
-     - Mobile: Header has Logo and Cart on top row. Search bar below. Login and Cart on third row (Wait, ASCII shows Login and Cart on third row). Categories horizontally scrollable. Business Info Strip. Today's Fresh deals with "View All". Selectors for Category & Sort. Product grid (1-2 columns?). Load More Products. Bottom Navigation.
-     - Product Card: Image, Name, Price, MOQ & Stock, Rating, Add to Cart.
-       No quantity selector (+/-), no View Details button, no live total, no extra spacing.
+1. **Understand the Goal**: Redesign the mobile buyer experience to look and feel like a modern ecommerce app (Amazon, Flipkart, Blinkit, etc.). The current design is likely just a desktop view scaled down, which isn't optimal for mobile users. We need to target specific buyer pages: `LandingPage.tsx`, `Products.tsx`, `ProductDetail.tsx`, `Cart.tsx`, `Checkout.tsx`, `Profile.tsx`, `Orders.tsx`. We must *not* change the desktop/tablet UI, backend, API, or admin pages.
 
-2. **Modify `WholesaleProductCard` in `LandingPage.tsx`:**
-   - Remove `useState(moq)` for quantity.
-   - Remove the `quantity` control section (the `- / +` buttons).
-   - Remove the `Live total` section.
-   - Remove the `View Details` button.
-   - Adjust `Add To Cart` button to just trigger `onAdd(product, moq)` (or whatever default is passed). Wait, in ASCII, "MOQ | Stock" are displayed. Add to cart should add the MOQ amount.
-   - Display format:
-     ```
-     Name
-     Price
-     MOQ | Stock
-     [Add Cart]
-     ```
-     (Or rating).
-   - Check if the card styling can be cleaned up (remove any extra vertical padding/spacing that is unnecessary).
+2. **Mobile Design Principles to Apply**:
+    - Thumb-friendly navigation and bottom action bars (e.g., sticky Add to Cart).
+    - Compact, readable cards with high visual hierarchy.
+    - Horizontal scrolling for categories or related items to save vertical space.
+    - Full-width images on product detail pages.
+    - Clear typography and padding suitable for touch targets but not excessively large.
+    - Using `hidden md:flex` or similar Tailwind responsive classes to conditionally render mobile-optimized vs desktop-optimized sections.
 
-3. **Modify `LandingPage.tsx` Mobile Layout & Structure:**
-   - The current mobile header in `LandingPage.tsx` is:
-     - Logo & Search & Nav.
-     - We should ensure it's responsive and matches ASCII. The Search bar currently becomes sticky on mobile (`sticky top-[68px]`).
-     - ASCII shows:
-       `FreshFlow Logo                 🛒 (2)`
-       `🔍 Search products, suppliers...      Search`
-       `Login                             🛒 Cart (2)`
-       Wait, this is an ASCII representation. It might just imply they are accessible. In the existing code, on mobile, the header is stacked. Let's make sure it looks close to the ASCII layout without drastically altering React structure unless necessary.
-       Wait! ASCII:
-       ```
-       ┌───────────────────────────────────────────────┐
-       │ FreshFlow                              🛒 (2) │
-       ├───────────────────────────────────────────────┤
-       │ 🔍 Search products, suppliers...      Search  │
-       ├───────────────────────────────────────────────┤
-       │ Login                             🛒 Cart (2) │
-       ├───────────────────────────────────────────────┤
-       ```
-       Actually, `Login` and `Cart` can be on the same row, or just one header row with Logo, Login, Cart, and a second row with Search.
-   - `Today's Fresh Deals` header on mobile has `View All` (or `Open Product Catalog`).
-   - `All Categories | Newest` sort dropdowns.
+3. **Specific File Modifications**:
+    - `LandingPage.tsx`:
+        - Convert the product grids to be a bit more compact on mobile (e.g., 2 columns with tighter spacing).
+        - Ensure category scroll is smooth and snap-based.
+        - Add a sticky search bar or bottom navigation for mobile if not present in the app layout.
+    - `Products.tsx`:
+        - For the buyer marketplace, hide the large sidebar filters on mobile and replace them with a sticky or fixed bottom filter/sort button that opens a drawer or dialog.
+        - Make the product cards smaller (e.g., 2-column grid on mobile) with optimized text sizes.
+    - `ProductDetail.tsx`:
+        - Make the product image span full width on mobile (no borders or rounded corners at the edges).
+        - Make the "Add to Cart" and "Buy Now" section sticky at the bottom on mobile (this seems already partially done, but needs refinement to look premium).
+    - `Cart.tsx`:
+        - Simplify the item list view. Reduce padding and use a more compact layout for the image, title, price, and quantity controls.
+        - Make the order summary sticky at the bottom for easy checkout access on mobile.
+    - `Checkout.tsx`:
+        - Ensure the form fields are easily tapable. Break down sections logically.
+        - Make the final "Place Order" button sticky at the bottom.
+    - `Profile.tsx`:
+        - Use a more mobile-native list view for settings and address management.
+    - `Orders.tsx`:
+        - Simplify the order history cards. Show key info (status, date, total, thumbnail) compactly.
 
-4. **Detailed Plan Steps:**
-   1. **Refactor `WholesaleProductCard`**: Strip it down to match the exact requirements. Name, Price, MOQ & Stock, Rating, Add To Cart. Clean up imports/states if unused (like `useState`, `Minus`, `Plus`, `Eye`).
-   2. **Refine `LandingPage` mobile layout**: Ensure correct margins, padding, and alignments. Ensure the product grid columns on mobile (ASCII has 2 columns: `Apple Image | Mango Image`). Make sure it is `grid-cols-2` or `sm:grid-cols-2` (currently it might be `grid gap-4 sm:grid-cols-2` so mobile default is 1 col! We should make it 2 cols if possible, but wait, ASCII has them side-by-side: `Apple` and `Mango` are on the same row! Let's change `grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4` to `grid grid-cols-2 gap-2 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-5` or similar, depending on what makes sense for cards without quantity selectors). Wait, ASCII shows 2 columns on mobile. We will update `ProductGrid` to use `grid-cols-2 sm:grid-cols-3 md:grid-cols-4 xl:grid-cols-5`.
-   3. **Ensure exact ASCII compliance**: Remove unneeded UI elements. Ensure pre-commit checks pass (`npm run build`, `npm run check`).
+4. **Implementation Strategy**:
+    - Iterate through each file.
+    - Look for `BuyerMarketplace` or buyer-specific components.
+    - Update Tailwind classes to separate mobile and desktop layouts using `md:`, `lg:` prefixes.
+    - Example: Instead of `<div className="grid grid-cols-2 gap-3 sm:grid-cols-3">`, we might use `<div className="grid grid-cols-2 gap-2 sm:gap-3 sm:grid-cols-3">` and optimize the card itself.
+
+5. **Pre-commit Steps**:
+    - Verify UI changes locally.
+    - Take screenshots as requested.
+    - Run build and type check.
