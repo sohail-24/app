@@ -1,14 +1,13 @@
 import { getDb } from "./connection";
 import { inventory, products, companies, type InsertInventory } from "@db/schema";
 import { eq, and, sql, asc } from "drizzle-orm";
+import { TRPCError } from "@trpc/server";
 
 function withoutUndefined<T extends Record<string, unknown>>(data: T) {
   return Object.fromEntries(
     Object.entries(data).filter(([, value]) => value !== undefined),
   ) as Partial<T>;
 }
-
-import { TRPCError } from "@trpc/server";
 
 export async function validateInventory(
   productId: number,

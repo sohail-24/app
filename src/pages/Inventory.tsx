@@ -176,7 +176,7 @@ export default function Inventory() {
   const deleteInventory = trpc.inventory.delete.useMutation({
     onSuccess: async () => {
       setSelectedId(null);
-      await afterInventoryChange("Inventory record deactivated. Existing orders are unchanged.");
+      await afterInventoryChange("Inventory record deleted successfully.");
     },
     onError: (error) => toast.error(error.message || "Could not delete inventory."),
   });
@@ -782,7 +782,7 @@ function InventoryManager({
           </div>
         </div>
         <div className="border-t pt-4">
-          <p className="mb-2 text-xs text-muted-foreground">Deleting inventory deactivates this record and preserves existing orders.</p>
+          <p className="mb-2 text-xs text-muted-foreground">Deleting inventory permanently removes this record and preserves existing orders.</p>
           <Button className="w-full" variant="destructive" onClick={onDelete} disabled={deleting}>
             {deleting ? "Deleting..." : "Delete Inventory"}
           </Button>
