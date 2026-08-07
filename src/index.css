@@ -10,7 +10,7 @@
     --card-foreground: 220 29% 9%;
     --popover: 0 0% 100%;
     --popover-foreground: 220 29% 9%;
-    --primary: 164 90% 28%;
+    --primary: 150 90% 30%;
     --primary-foreground: 0 0% 98%;
     --secondary: 214 32% 91%;
     --secondary-foreground: 220 29% 12%;
@@ -22,8 +22,8 @@
     --destructive-foreground: 0 0% 98%;
     --border: 214 20% 86%;
     --input: 214 20% 86%;
-    --ring: 164 90% 28%;
-    --radius: 0.5rem;
+    --ring: 150 90% 30%;
+    --radius: 0.75rem;
     --sidebar-background: 220 29% 9%;
     --sidebar-foreground: 216 24% 88%;
     --sidebar-primary: 164 76% 42%;
@@ -76,6 +76,10 @@
 }
 
 @layer utilities {
+  .pb-safe {
+    padding-bottom: env(safe-area-inset-bottom);
+  }
+
   .erp-surface {
     @apply rounded-lg border bg-card shadow-xs;
   }

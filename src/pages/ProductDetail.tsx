@@ -9,7 +9,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
-import { ArrowLeft, Check, Heart, Minus, Package, Plus, Share2, ShoppingCart, Zap } from "lucide-react";
+import { ArrowLeft, Heart, Minus, Package, Plus, Share2, ShoppingCart, Zap } from "lucide-react";
 
 export default function ProductDetail() {
   const { slug } = useParams<{ slug: string }>();
@@ -107,8 +107,8 @@ export default function ProductDetail() {
         </div>
       </section>
 
-      <section className="grid gap-8 lg:grid-cols-[minmax(280px,360px)_minmax(0,1fr)]">
-        <div className="overflow-hidden rounded-lg border bg-muted">
+      <section className="grid gap-8 lg:grid-cols-[400px_1fr]">
+        <div className="overflow-hidden rounded-xl border bg-muted">
           <div className="flex aspect-square items-center justify-center text-xl font-semibold text-muted-foreground">
             {product.image && !imageFailed ? (
               <img src={product.image} alt={product.name} className="h-full w-full object-cover" onError={() => setImageFailed(true)} />
@@ -118,7 +118,7 @@ export default function ProductDetail() {
           </div>
         </div>
 
-        <div className="space-y-5">
+        <div className="space-y-5 pb-32 md:pb-0">
           <div className="flex flex-wrap gap-2">
             <Badge variant="outline">{product.categoryName ?? "Uncategorized"}</Badge>
             <Badge variant="secondary">{product.grade ?? "Grade A"}</Badge>
@@ -139,38 +139,43 @@ export default function ProductDetail() {
             <p>Origin: {product.origin ?? "Not set"}</p>
             <p>Grade: {product.grade ?? "Not set"}</p>
           </div>
-          <div className="space-y-2">
-            <p className="text-sm font-medium">Quantity</p>
-            <div className="flex items-center gap-3">
-              <Button variant="outline" size="icon" onClick={() => setQuantity(Math.max(minQty, quantity - 1))} disabled={quantity <= minQty || isOutOfStock}>
-                <Minus className="h-4 w-4" />
+
+          <div className="fixed bottom-0 left-0 right-0 z-50 bg-card border-t p-4 flex flex-col gap-3 shadow-[0_-4px_20px_-2px_rgba(0,0,0,0.1)] pb-safe md:static md:shadow-none md:border-none md:p-0 md:bg-transparent">
+            <div className="flex flex-col gap-2 md:block md:space-y-2">
+              <p className="text-sm font-medium hidden md:block">Quantity</p>
+              <div className="flex items-center justify-between md:justify-start gap-4">
+                <div className="flex items-center gap-3">
+                  <Button variant="outline" size="icon" className="h-10 w-10 shadow-sm" onClick={() => setQuantity(Math.max(minQty, quantity - 1))} disabled={quantity <= minQty || isOutOfStock}>
+                    <Minus className="h-4 w-4" />
+                  </Button>
+                  <span className="min-w-16 text-center font-semibold">{quantity} {unit}</span>
+                  <Button variant="outline" size="icon" className="h-10 w-10 shadow-sm" onClick={() => {
+                    if (quantity >= stock) {
+                      toast.error(`Only ${stock} available.`);
+                    } else {
+                      setQuantity(quantity + 1);
+                    }
+                  }} disabled={isOutOfStock}>
+                    <Plus className="h-4 w-4" />
+                  </Button>
+                </div>
+                <div className="text-right md:mt-4 md:text-left">
+                  <p className="text-sm text-muted-foreground md:hidden">Live Total</p>
+                  <p className="text-lg font-bold text-foreground md:text-xl">Total : {formatCurrency(price * quantity)}</p>
+                </div>
+              </div>
+            </div>
+
+            <div className="grid gap-3 grid-cols-2 md:mt-4">
+              <Button variant="outline" className="h-12 bg-card" onClick={() => addProduct()} disabled={isOutOfStock}>
+                <ShoppingCart className="mr-2 h-4 w-4" />
+                {isOutOfStock ? "Out of Stock" : "Add to Cart"}
               </Button>
-              <span className="min-w-20 text-center font-medium">{quantity} {unit}</span>
-              <Button variant="outline" size="icon" onClick={() => {
-                if (quantity >= stock) {
-                  toast.error(`Only ${stock} available.`);
-                } else {
-                  setQuantity(quantity + 1);
-                }
-              }} disabled={isOutOfStock}>
-                <Plus className="h-4 w-4" />
+              <Button className="h-12 bg-primary hover:bg-primary/90" onClick={() => addProduct("/checkout")} disabled={isOutOfStock}>
+                <Zap className="mr-2 h-4 w-4" />
+                {isOutOfStock ? "Out of Stock" : "Buy Now"}
               </Button>
             </div>
-          </div>
-          <p className="text-lg font-semibold">Total : {formatCurrency(price * quantity)}</p>
-          <div className="grid gap-3 md:grid-cols-2">
-            <Button variant="outline" className="h-12" onClick={() => addProduct()} disabled={isOutOfStock}>
-              <ShoppingCart className="mr-2 h-4 w-4" />
-              {isOutOfStock ? "Out of Stock" : "Add & Continue Shopping"}
-            </Button>
-            <Button className="h-12 bg-emerald-600 hover:bg-emerald-700" onClick={() => addProduct("/checkout")} disabled={isOutOfStock}>
-              <Zap className="mr-2 h-4 w-4" />
-              {isOutOfStock ? "Out of Stock" : "Buy Now"}
-            </Button>
-            <Button className="h-12 md:col-span-2" onClick={() => addProduct("/cart")} disabled={addToCart.isPending || isOutOfStock}>
-              <Check className="mr-2 h-4 w-4" />
-              {isOutOfStock ? "Out of Stock" : "Add to Cart & Go to Cart"}
-            </Button>
           </div>
         </div>
       </section>

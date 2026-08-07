@@ -252,10 +252,12 @@ function ProductCard({ product, onAdd, pending }: { product: CatalogProduct; onA
   const [imageFailed, setImageFailed] = useState(false);
 
   return (
-    <Card className="overflow-hidden shadow-sm">
-      <div className="flex aspect-[4/3] items-center justify-center bg-muted text-lg font-semibold text-muted-foreground">
-        {product.image && !imageFailed ? <img src={product.image} alt={product.name} className="h-full w-full object-cover" onError={() => setImageFailed(true)} /> : <ImageIcon className="h-9 w-9" />}
-      </div>
+    <Card className="overflow-hidden rounded-xl shadow-sm hover:shadow-premium hover:-translate-y-1 transition-all duration-300 border-border">
+      <Link to={`/products/${product.slug}`} className="block relative">
+        <div className="flex aspect-square items-center justify-center bg-muted text-lg font-semibold text-muted-foreground">
+          {product.image && !imageFailed ? <img src={product.image} alt={product.name} className="h-full w-full object-cover" onError={() => setImageFailed(true)} /> : <ImageIcon className="h-9 w-9" />}
+        </div>
+      </Link>
       <CardContent className="space-y-3 p-4 text-sm">
         <div>
           <Link to={`/products/${product.slug}`} className="text-base font-semibold hover:text-primary">{product.name}</Link>
@@ -267,19 +269,19 @@ function ProductCard({ product, onAdd, pending }: { product: CatalogProduct; onA
           <p>MOQ {moq} {unit}</p>
           {product.rating && <p>Rating {product.rating}</p>}
         </div>
-        <div className="flex items-center justify-between rounded-md border p-2">
-          <Button variant="outline" size="icon" className="h-7 w-7" onClick={() => setQuantity(Math.max(moq, quantity - 1))} disabled={quantity <= moq || isOutOfStock}>
-            <Minus className="h-3 w-3" />
+        <div className="flex items-center justify-between rounded-lg border bg-muted/50 p-2">
+          <Button variant="outline" size="icon" className="h-10 w-10 bg-card rounded-md shadow-sm transition-transform active:scale-95" onClick={() => setQuantity(Math.max(moq, quantity - 1))} disabled={quantity <= moq || isOutOfStock}>
+            <Minus className="h-4 w-4" />
           </Button>
-          <span>{quantity}{unit}</span>
-          <Button variant="outline" size="icon" className="h-7 w-7" onClick={() => {
+          <span className="min-w-20 text-center font-semibold">{quantity} {unit}</span>
+          <Button variant="outline" size="icon" className="h-10 w-10 bg-card rounded-md shadow-sm transition-transform active:scale-95" onClick={() => {
             if (quantity >= stock) {
               toast.error(`Only ${stock} available.`);
             } else {
               setQuantity(quantity + 1);
             }
           }} disabled={isOutOfStock}>
-            <Plus className="h-3 w-3" />
+            <Plus className="h-4 w-4" />
           </Button>
         </div>
         <p className="font-semibold">Total {formatCurrency(price * quantity)}</p>
@@ -327,27 +329,25 @@ function OwnerProductCatalog() {
           </div>
         </CardContent>
       </Card>
-      <Card>
-        <CardContent className="divide-y p-0">
-          {productsQuery.isLoading ? (
-            Array.from({ length: 6 }).map((_, index) => <Skeleton key={index} className="m-4 h-14" />)
-          ) : products.length ? (
-            products.map((product) => (
-              <Link key={product.id} to={`/products/${product.slug}`} className="grid gap-3 p-4 hover:bg-muted/40 md:grid-cols-[1fr_160px_120px_100px]">
-                <div className="min-w-0">
-                  <p className="truncate font-medium">{product.name}</p>
-                  <p className="text-xs text-muted-foreground">{product.categoryName ?? "Uncategorized"} · {product.supplierName ?? "Supplier"}</p>
-                </div>
-                <p className="font-medium">{formatCurrency(product.unitPrice)}</p>
-                <Badge variant="secondary" className="w-fit capitalize">{product.status}</Badge>
-                <p className="text-sm text-muted-foreground">MOQ {product.minimumOrderQuantity}</p>
-              </Link>
-            ))
-          ) : (
-            <div className="p-8 text-center text-sm text-muted-foreground">No products found.</div>
-          )}
-        </CardContent>
-      </Card>
+      <div className="space-y-3">
+        {productsQuery.isLoading ? (
+          Array.from({ length: 6 }).map((_, index) => <Skeleton key={index} className="h-20 rounded-xl" />)
+        ) : products.length ? (
+          products.map((product) => (
+            <Link key={product.id} to={`/products/${product.slug}`} className="grid gap-3 p-4 sm:p-6 rounded-xl border border-border bg-card shadow-sm hover:shadow-md transition-all md:grid-cols-[1fr_160px_120px_100px] items-center">
+              <div className="min-w-0">
+                <p className="truncate font-semibold">{product.name}</p>
+                <p className="text-xs text-muted-foreground mt-0.5">{product.categoryName ?? "Uncategorized"} · {product.supplierName ?? "Supplier"}</p>
+              </div>
+              <p className="font-semibold text-primary">{formatCurrency(product.unitPrice)}</p>
+              <Badge variant="secondary" className="w-fit capitalize">{product.status}</Badge>
+              <p className="text-sm text-muted-foreground font-medium">MOQ {product.minimumOrderQuantity}</p>
+            </Link>
+          ))
+        ) : (
+          <div className="rounded-xl border border-dashed p-8 text-center text-sm text-muted-foreground bg-card">No products found.</div>
+        )}
+      </div>
     </div>
   );
 }

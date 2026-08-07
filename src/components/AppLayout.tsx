@@ -327,9 +327,36 @@ function AppLayoutContent() {
           </div>
         </header>
 
-        <main className="min-w-0 flex-1 px-4 py-5 sm:px-6 lg:px-8">
+        <main className="min-w-0 flex-1 px-4 py-5 pb-24 md:pb-5 sm:px-6 lg:px-8">
           <Outlet />
         </main>
+
+        {/* Mobile Bottom Navigation */}
+        <div className="fixed bottom-0 left-0 right-0 z-50 flex h-16 items-center justify-around bg-card border-t pb-safe md:hidden shadow-[0_-4px_20px_-2px_rgba(0,0,0,0.05)]">
+          <Link to={role === "buyer" ? "/" : "/dashboard"} className={`flex flex-col items-center gap-1 ${isActive(role === "buyer" ? "/" : "/dashboard") ? "text-primary" : "text-muted-foreground"}`}>
+            <LayoutDashboard className="h-5 w-5" />
+            <span className="text-[10px] font-medium">Home</span>
+          </Link>
+          <Link to="/products" className={`flex flex-col items-center gap-1 ${isActive("/products") ? "text-primary" : "text-muted-foreground"}`}>
+            <ShoppingBag className="h-5 w-5" />
+            <span className="text-[10px] font-medium">Catalog</span>
+          </Link>
+          <Link to="/cart" className={`relative flex flex-col items-center gap-1 ${isActive("/cart") ? "text-primary" : "text-muted-foreground"}`}>
+            <div className="relative">
+              <ShoppingCart className="h-5 w-5" />
+              {!!cartQuery.data?.count && (
+                <span className="absolute -right-2 -top-2 flex h-4 w-4 items-center justify-center rounded-full bg-primary text-[9px] font-bold text-primary-foreground">
+                  {cartQuery.data.count}
+                </span>
+              )}
+            </div>
+            <span className="text-[10px] font-medium">Cart</span>
+          </Link>
+          <Link to="/profile" className={`flex flex-col items-center gap-1 ${isActive("/profile") ? "text-primary" : "text-muted-foreground"}`}>
+            <User className="h-5 w-5" />
+            <span className="text-[10px] font-medium">Profile</span>
+          </Link>
+        </div>
       </SidebarInset>
     </>
   );

@@ -148,15 +148,15 @@ export default function LandingPage() {
               <span className="text-xl font-bold tracking-tight">FreshFlow</span>
             </Link>
 
-            <form onSubmit={handleSearchSubmit} className="relative min-w-0">
-              <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+            <form onSubmit={handleSearchSubmit} className="relative min-w-0 sticky top-[68px] z-40 bg-background/95 backdrop-blur py-2 -mx-3 px-3 md:mx-0 md:px-0 md:static md:bg-transparent md:py-0">
+              <Search className="pointer-events-none absolute left-6 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground md:left-3" />
               <Input
                 value={search}
                 onChange={(event) => setSearch(event.target.value)}
                 placeholder="Search products, suppliers, categories..."
                 className="h-11 rounded-md border-border bg-muted/50 pl-10 pr-24 text-base focus-visible:ring-ring"
               />
-              <Button type="submit" size="sm" className="absolute right-1.5 top-1/2 h-8 -translate-y-1/2 bg-primary hover:bg-primary/90">
+              <Button type="submit" size="sm" className="absolute right-4 top-1/2 h-8 -translate-y-1/2 bg-primary hover:bg-primary/90 md:right-1.5">
                 Search
               </Button>
             </form>
@@ -292,11 +292,11 @@ export default function LandingPage() {
           </div>
 
           {categoriesQuery.isLoading ? (
-            <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-              {Array.from({ length: 8 }).map((_, index) => <Skeleton key={index} className="h-24" />)}
+            <div className="flex gap-4 overflow-x-auto snap-x hide-scrollbar pb-2">
+              {Array.from({ length: 8 }).map((_, index) => <Skeleton key={index} className="h-24 min-w-[200px]" />)}
             </div>
           ) : categories.length ? (
-            <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+            <div className="flex gap-4 overflow-x-auto snap-x snap-mandatory hide-scrollbar pb-2">
               {categories.slice(0, 8).map((category, index) => {
                 const Icon = categoryIcons[index % categoryIcons.length];
                 return (
@@ -304,14 +304,14 @@ export default function LandingPage() {
                     key={category.id}
                     type="button"
                     onClick={() => setCategoryId(String(category.id))}
-                    className="flex min-h-24 items-center gap-3 rounded-lg border border-border bg-card p-4 text-left shadow-sm transition hover:border-primary/50 hover:bg-primary/10"
+                    className="flex min-w-[200px] snap-start items-center gap-3 rounded-xl border border-border bg-card p-4 text-left shadow-sm transition-all hover:shadow-premium hover:-translate-y-1 hover:border-primary/50 hover:bg-primary/5"
                   >
-                    <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-md bg-muted text-primary">
-                      <Icon className="h-5 w-5" />
+                    <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary">
+                      <Icon className="h-6 w-6" />
                     </span>
                     <span className="min-w-0">
                       <span className="block truncate font-semibold">{category.name}</span>
-                      <span className="line-clamp-2 text-sm text-muted-foreground">{category.description || "Wholesale products and supplier listings"}</span>
+                      <span className="line-clamp-2 text-xs text-muted-foreground mt-0.5">{category.description || "Wholesale"}</span>
                     </span>
                   </button>
                 );
@@ -413,15 +413,20 @@ function WholesaleProductCard({
   const total = price * quantity;
 
   return (
-    <Card className="overflow-hidden rounded-lg border-border bg-card shadow-sm">
-      <Link to={`/products/${product.slug}`} className="block">
-        <div className="flex aspect-[4/3] items-center justify-center bg-muted text-muted-foreground">
+    <Card className="overflow-hidden rounded-xl border-border bg-card shadow-sm hover:shadow-premium hover:-translate-y-1 transition-all duration-300">
+      <Link to={`/products/${product.slug}`} className="block relative">
+        <div className="flex aspect-square items-center justify-center bg-muted text-muted-foreground">
           {product.image && !imageFailed ? (
             <img src={product.image} alt={product.name} className="h-full w-full object-cover" onError={() => setImageFailed(true)} />
           ) : (
             <ImageIcon className="h-10 w-10" />
           )}
         </div>
+        {compareAt > price && (
+          <Badge className="absolute top-2 left-2 bg-destructive/90 text-destructive-foreground pointer-events-none">
+            {Math.round(((compareAt - price) / compareAt) * 100)}% OFF
+          </Badge>
+        )}
       </Link>
       <CardContent className="space-y-3 p-4">
         <div className="min-h-[62px]">
@@ -445,22 +450,22 @@ function WholesaleProductCard({
           </div>
         </div>
 
-        <div className="flex items-center justify-between rounded-md border border-border bg-muted/50 p-2">
+        <div className="flex items-center justify-between rounded-lg border border-border bg-muted/50 p-2">
           <Button
             type="button"
             variant="outline"
             size="icon"
-            className="h-8 w-8 bg-card"
+            className="h-10 w-10 rounded-md bg-card shadow-sm transition-transform active:scale-95"
             onClick={() => setQuantity(Math.max(moq, quantity - 1))}
             disabled={quantity <= moq}
           >
-            <Minus className="h-3.5 w-3.5" />
+            <Minus className="h-4 w-4" />
           </Button>
           <span className="min-w-20 text-center text-sm font-semibold">
             {quantity} {unitLabel}
           </span>
-          <Button type="button" variant="outline" size="icon" className="h-8 w-8 bg-card" onClick={() => setQuantity(quantity + 1)}>
-            <Plus className="h-3.5 w-3.5" />
+          <Button type="button" variant="outline" size="icon" className="h-10 w-10 rounded-md bg-card shadow-sm transition-transform active:scale-95" onClick={() => setQuantity(quantity + 1)}>
+            <Plus className="h-4 w-4" />
           </Button>
         </div>
 

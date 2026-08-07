@@ -105,7 +105,7 @@ function BuyerDashboard({
 
   return (
     <div className="mx-auto flex w-full max-w-[1500px] flex-col gap-6">
-      <section className="rounded-lg border bg-card p-4 shadow-sm sm:p-6">
+      <section className="rounded-xl border bg-card p-6 shadow-premium">
         <Badge variant="secondary" className="mb-3 rounded-md">Buyer Workspace</Badge>
         <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
           <div>
@@ -127,7 +127,7 @@ function BuyerDashboard({
         </div>
       </section>
 
-      <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+      <section className="grid gap-4 sm:gap-6 md:grid-cols-2 xl:grid-cols-4">
         <MetricCard icon={ShoppingCart} title="Cart Items" value={formatNumber(cartCount)} caption="Current cart" loading={cartLoading} />
         <MetricCard icon={Truck} title="Pending Deliveries" value={formatNumber(recentOrders.filter((order) => order.status !== "delivered").length)} caption="From order history" loading={ordersLoading} />
         <MetricCard icon={FolderTree} title="Categories" value={formatNumber(categoryCount)} caption="Active catalog groups" />
