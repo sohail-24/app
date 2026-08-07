@@ -8,13 +8,10 @@ import {
   ChevronDown,
   CircleUserRound,
   Droplets,
-  Eye,
   Image as ImageIcon,
   Leaf,
   LogIn,
-  Minus,
   Package,
-  Plus,
   Search,
   ShoppingCart,
   Sparkles,
@@ -374,8 +371,8 @@ function ProductGrid({
 }) {
   if (loading) {
     return (
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-        {Array.from({ length: compact ? 4 : 8 }).map((_, index) => <Skeleton key={index} className="h-[430px] rounded-lg" />)}
+      <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
+        {Array.from({ length: compact ? 4 : 8 }).map((_, index) => <Skeleton key={index} className="h-[300px] rounded-lg" />)}
       </div>
     );
   }
@@ -385,7 +382,7 @@ function ProductGrid({
   }
 
   return (
-    <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+    <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
       {products.map((product) => (
         <WholesaleProductCard key={product.id} product={product} onAdd={onAdd} pending={pending} />
       ))}
@@ -407,10 +404,8 @@ function WholesaleProductCard({
   const moq = product.minimumOrderQuantity ?? 1;
   const unit = product.unitType ?? "kg";
   const availableStock = product.stock ?? (product.status === "active" ? "Available" : "Limited");
-  const [quantity, setQuantity] = useState(moq);
   const [imageFailed, setImageFailed] = useState(false);
   const unitLabel = unitLabels[unit] ?? unit;
-  const total = price * quantity;
 
   return (
     <Card className="overflow-hidden rounded-xl border-border bg-card shadow-sm hover:shadow-premium hover:-translate-y-1 transition-all duration-300">
@@ -436,7 +431,7 @@ function WholesaleProductCard({
           <p className="mt-1 truncate text-xs text-muted-foreground">{product.supplierName ?? "Verified Supplier"}</p>
         </div>
 
-        <div className="space-y-1 text-sm">
+        <div className="space-y-2 text-sm">
           <div className="flex flex-wrap items-baseline gap-2">
             <span className="text-lg font-bold text-primary">{formatCurrency(price)}</span>
             <span className="text-muted-foreground">/ {unitLabel}</span>
@@ -450,46 +445,16 @@ function WholesaleProductCard({
           </div>
         </div>
 
-        <div className="flex items-center justify-between rounded-lg border border-border bg-muted/50 p-2">
-          <Button
-            type="button"
-            variant="outline"
-            size="icon"
-            className="h-10 w-10 rounded-md bg-card shadow-sm transition-transform active:scale-95"
-            onClick={() => setQuantity(Math.max(moq, quantity - 1))}
-            disabled={quantity <= moq}
-          >
-            <Minus className="h-4 w-4" />
-          </Button>
-          <span className="min-w-20 text-center text-sm font-semibold">
-            {quantity} {unitLabel}
-          </span>
-          <Button type="button" variant="outline" size="icon" className="h-10 w-10 rounded-md bg-card shadow-sm transition-transform active:scale-95" onClick={() => setQuantity(quantity + 1)}>
-            <Plus className="h-4 w-4" />
-          </Button>
-        </div>
-
-        <div className="flex items-center justify-between text-sm">
-          <span className="text-muted-foreground">Live total</span>
-          <span className="font-bold text-foreground">{formatCurrency(total)}</span>
-        </div>
-
-        <div className="grid gap-2">
+        <div className="pt-2">
           <Button
             type="button"
             className="w-full bg-primary hover:bg-primary/90"
-            onClick={() => onAdd(product, quantity)}
+            onClick={() => onAdd(product, moq)}
             disabled={pending}
           >
             <ShoppingCart className="mr-2 h-4 w-4" />
             Add To Cart
           </Button>
-          <Link to={`/products/${product.slug}`}>
-            <Button variant="outline" className="w-full border-border">
-              <Eye className="mr-2 h-4 w-4" />
-              View Details
-            </Button>
-          </Link>
         </div>
       </CardContent>
     </Card>
