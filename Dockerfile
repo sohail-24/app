@@ -58,6 +58,6 @@ COPY nginx/nginx.conf /etc/nginx/nginx.conf
 COPY nginx/50x.html /usr/share/nginx/html/50x.html
 
 # Expose port
-EXPOSE 80
+EXPOSE 80 443
 
 CMD ["nginx", "-g", "daemon off;"]
