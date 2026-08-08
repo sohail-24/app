@@ -7,6 +7,7 @@ import {
   Boxes,
   ChevronDown,
   CircleUserRound,
+  LayoutGrid,
   ShieldCheck,
   Droplets,
   Image as ImageIcon,
@@ -65,6 +66,19 @@ const infoStrip = [
 ];
 
 const categoryIcons = [Apple, Leaf, Droplets, Wheat, Boxes, Sparkles, Beef, Package];
+
+function getCategoryEmoji(name: string): string | React.ElementType {
+  const lowerName = name.toLowerCase();
+  if (lowerName === "all products") return LayoutGrid;
+  if (lowerName.includes("citrus")) return "🍊";
+  if (lowerName.includes("tropical")) return "🥭";
+  if (lowerName.includes("berries")) return "🍓";
+  if (lowerName.includes("stone fruits")) return "🍑";
+  if (lowerName.includes("apples") || lowerName.includes("pears")) return "🍎";
+  if (lowerName.includes("grapes")) return "🍇";
+  if (lowerName.includes("exotic")) return "🥝";
+  return "🌿"; // fallback
+}
 
 export default function LandingPage() {
   const navigate = useNavigate();
@@ -189,7 +203,7 @@ export default function LandingPage() {
             </nav>
           </div>
 
-          <div className="-mx-3 overflow-x-auto border-t border-slate-100 px-3 pt-2 sm:-mx-4 sm:px-4 lg:-mx-6 lg:px-6">
+          <div className="-mx-3 overflow-x-auto border-t border-slate-100 px-3 pt-2 sm:-mx-4 sm:px-4 lg:-mx-6 lg:px-6 hidden sm:block">
             <div className="flex min-w-max gap-2">
               {categoriesQuery.isLoading ? (
                 Array.from({ length: 8 }).map((_, index) => <Skeleton key={index} className="h-9 w-24 shrink-0" />)
@@ -212,6 +226,44 @@ export default function LandingPage() {
                   More <ChevronDown className="h-3.5 w-3.5" />
                 </Button>
               </Link>
+            </div>
+          </div>
+
+          <div className="-mx-3 overflow-x-auto border-t border-slate-100 px-3 py-3 sm:hidden hide-scrollbar">
+            <div className="flex min-w-max gap-4 px-2">
+              {categoriesQuery.isLoading ? (
+                Array.from({ length: 6 }).map((_, index) => (
+                  <div key={index} className="flex flex-col items-center gap-1">
+                    <Skeleton className="h-14 w-14 rounded-full" />
+                    <Skeleton className="h-3 w-16" />
+                  </div>
+                ))
+              ) : (
+                categoryNavItems.map((category) => {
+                  const isActive = categoryId === category.id;
+                  const EmojiOrIcon = getCategoryEmoji(category.name);
+
+                  return (
+                    <button
+                      key={category.id}
+                      type="button"
+                      onClick={() => setCategoryId(category.id)}
+                      className="flex flex-col items-center gap-1.5 shrink-0 group focus:outline-none"
+                    >
+                      <div className={`flex h-14 w-14 items-center justify-center rounded-full border shadow-sm transition-all ${isActive ? 'bg-primary border-primary text-primary-foreground' : 'bg-card border-border text-foreground group-active:scale-95'}`}>
+                        {typeof EmojiOrIcon === 'string' ? (
+                          <span className="text-2xl">{EmojiOrIcon}</span>
+                        ) : (
+                          <EmojiOrIcon className="h-6 w-6" />
+                        )}
+                      </div>
+                      <span className={`text-[10px] sm:text-xs font-medium max-w-[64px] truncate text-center ${isActive ? 'text-primary font-bold' : 'text-foreground/80'}`}>
+                        {category.name}
+                      </span>
+                    </button>
+                  );
+                })
+              )}
             </div>
           </div>
         </div>
@@ -256,7 +308,7 @@ export default function LandingPage() {
             <div>
               <p className="text-sm font-medium text-primary">Wholesale Marketplace</p>
               <h1 className="text-2xl font-semibold tracking-tight sm:text-3xl">Today's Fresh Deals</h1>
-              <p className="mt-1 text-sm text-muted-foreground">
+              <p className="mt-1 text-sm text-muted-foreground hidden sm:block">
                 Browse active wholesale products before logging in. MOQ, stock, supplier, and price stay visible.
               </p>
             </div>
