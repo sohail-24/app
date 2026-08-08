@@ -7,6 +7,7 @@ import {
   Boxes,
   ChevronDown,
   CircleUserRound,
+  ClipboardList,
   LayoutGrid,
   ShieldCheck,
   Droplets,
@@ -153,12 +154,21 @@ export default function LandingPage() {
       <header className="sticky top-0 z-50 border-b border-border bg-background shadow-sm">
         <div className="mx-auto flex max-w-7xl flex-col gap-3 px-3 py-3 sm:px-4 lg:px-6">
           <div className="grid gap-3 md:grid-cols-[auto_minmax(280px,1fr)_auto] md:items-center">
-            <Link to="/" className="flex w-fit items-center gap-2">
-              <span className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary text-white">
-                <Leaf className="h-5 w-5" />
-              </span>
-              <span className="text-xl font-bold tracking-tight">FreshFlow</span>
-            </Link>
+            <div className="flex items-center justify-between">
+              <Link to="/" className="flex w-fit items-center gap-2">
+                <span className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary text-white">
+                  <Leaf className="h-5 w-5" />
+                </span>
+                <span className="text-xl font-bold tracking-tight">FreshFlow</span>
+              </Link>
+              <Link
+                to="/orders"
+                className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full border border-border bg-background text-primary shadow-sm transition-all active:scale-95 sm:hidden"
+                aria-label="Purchase Orders"
+              >
+                <ClipboardList className="h-5 w-5" />
+              </Link>
+            </div>
 
             <form onSubmit={handleSearchSubmit} className="relative min-w-0 sticky top-[68px] z-40 bg-background/95 backdrop-blur py-2 -mx-3 px-3 md:mx-0 md:px-0 md:static md:bg-transparent md:py-0">
               <Search className="pointer-events-none absolute left-6 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground md:left-3" />
