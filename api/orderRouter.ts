@@ -20,6 +20,8 @@ import {
 import { getCartTotal } from "./queries/cart";
 import { findBuyerProductById } from "./queries/products";
 import { validateInventory } from "./queries/inventory";
+import { razorpay } from "./lib/razorpay";
+import * as crypto from "crypto";
 import { generateInvoiceFromOrder } from "./queries/invoices";
 import { calculateGstForOrder } from "./queries/gst";
 import { calculateShippingForOrder } from "./queries/shipping";
@@ -212,6 +214,94 @@ export const orderRouter = createRouter({
       return order;
     }),
 
+  createRazorpayOrder: authedQuery
+    .input(
+      z.object({
+        shippingState: z.string().trim().min(2).max(100),
+        shippingMethodId: z.number().int().positive().optional(),
+      })
+    )
+    .mutation(async ({ ctx, input }) => {
+      const cart = await getCartTotal(ctx.user.id);
+      if (cart.items.length === 0) {
+        throw new TRPCError({
+          code: "BAD_REQUEST",
+          message: "Cart is empty",
+        });
+      }
+
+      const gstItems = [];
+      let supplierId: null | number = null;
+      for (const item of cart.items) {
+        const product = await findBuyerProductById(item.productId);
+        if (!product) continue;
+        if (supplierId === null) supplierId = product.supplierId;
+        gstItems.push({
+          productId: product.id,
+          categoryId: product.categoryId,
+          taxableAmount: Number(item.unitPrice) * item.quantity,
+        });
+      }
+
+      if (supplierId === null) {
+        throw new TRPCError({
+          code: "BAD_REQUEST",
+          message: "No valid products in cart",
+        });
+      }
+
+      const ownerUser = await findUserByEmail(BUSINESS_OWNER_EMAIL);
+      const platformCompanyId = ownerUser?.companyId;
+      if (!platformCompanyId) {
+        throw new TRPCError({
+          code: "INTERNAL_SERVER_ERROR",
+          message: "Platform configuration error",
+        });
+      }
+
+      const [gst, shipping] = await Promise.all([
+        calculateGstForOrder({ companyId: supplierId, items: gstItems }),
+        calculateShippingForOrder({
+          companyId: platformCompanyId,
+          subtotal: cart.total,
+          state: input.shippingState,
+          shippingMethodId: input.shippingMethodId,
+        }),
+      ]);
+
+      if (!shipping.available) {
+        throw new TRPCError({
+          code: "BAD_REQUEST",
+          message: "Delivery is not available for the selected state.",
+        });
+      }
+
+      const totalAmount = cart.total + gst.taxAmount + shipping.shippingAmount;
+      // Amount in paise
+      const amount = Math.round(totalAmount * 100);
+
+      try {
+        const order = await razorpay.orders.create({
+          amount,
+          currency: "INR",
+          receipt: `rcpt_${Date.now()}_${ctx.user.id}`,
+        });
+
+        return {
+          id: order.id,
+          amount: order.amount,
+          currency: order.currency,
+          keyId: process.env.RAZORPAY_KEY_ID || "",
+        };
+      } catch (error) {
+        console.error("Razorpay order creation error:", error);
+        throw new TRPCError({
+          code: "INTERNAL_SERVER_ERROR",
+          message: "Failed to initialize payment.",
+        });
+      }
+    }),
+
   create: authedQuery
     .input(
       z.object({
@@ -229,6 +319,10 @@ export const orderRouter = createRouter({
         shippingMethod: z.string().optional(),
         shippingMethodId: z.number().int().positive().optional(),
         buyerNotes: z.string().optional(),
+        paymentMethod: z.enum(["upi", "cod"]).default("cod"),
+        razorpayPaymentId: z.string().optional(),
+        razorpayOrderId: z.string().optional(),
+        razorpaySignature: z.string().optional(),
       })
     )
     .mutation(async ({ ctx, input }) => {
@@ -353,6 +447,28 @@ export const orderRouter = createRouter({
       const totalAmount = subtotal + taxAmount + shippingAmount;
       const orderNumber = `FF-${Date.now()}-${ctx.user.id}`;
 
+      if (input.paymentMethod === "upi") {
+        if (!input.razorpayOrderId || !input.razorpayPaymentId || !input.razorpaySignature) {
+          throw new TRPCError({
+            code: "BAD_REQUEST",
+            message: "Missing Razorpay payment details.",
+          });
+        }
+
+        const body = input.razorpayOrderId + "|" + input.razorpayPaymentId;
+        const expectedSignature = crypto
+          .createHmac("sha256", process.env.RAZORPAY_KEY_SECRET || "")
+          .update(body.toString())
+          .digest("hex");
+
+        if (expectedSignature !== input.razorpaySignature) {
+          throw new TRPCError({
+            code: "BAD_REQUEST",
+            message: "Invalid payment signature.",
+          });
+        }
+      }
+
       const order = await createOrderFromCart({
         userId: ctx.user.id,
         order: {
@@ -382,6 +498,11 @@ export const orderRouter = createRouter({
           shippingMethodId: shipping.shippingMethodId,
           gstConfigId: gst.gstConfigId,
           buyerNotes: input.buyerNotes,
+          paymentMethod: input.paymentMethod,
+          paymentStatus: input.paymentMethod === "upi" ? "paid" : "pending",
+          razorpayOrderId: input.razorpayOrderId,
+          razorpayPaymentId: input.razorpayPaymentId,
+          razorpaySignature: input.razorpaySignature,
         },
         items: orderItemsData,
       });
