@@ -15,6 +15,13 @@
       "when": 1785847665251,
       "tag": "0001_giant_the_professor",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1786205810669,
+      "tag": "0002_big_jack_murdock",
+      "breakpoints": true
     }
   ]
 }

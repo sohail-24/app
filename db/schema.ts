@@ -74,6 +74,7 @@ export const paymentStatusEnum = pgEnum("paymentStatus", [
   "refunded",
   "failed",
 ]);
+export const paymentMethodEnum = pgEnum("paymentMethod", ["upi", "cod"]);
 export const userGenderEnum = pgEnum("user_gender", [
   "male",
   "female",
@@ -488,6 +489,12 @@ export const orders = pgTable(
     paymentStatus: paymentStatusEnum("paymentStatus")
       .default("pending")
       .notNull(),
+    paymentMethod: paymentMethodEnum("paymentMethod")
+      .default("cod")
+      .notNull(),
+    razorpayOrderId: varchar("razorpayOrderId", { length: 255 }),
+    razorpayPaymentId: varchar("razorpayPaymentId", { length: 255 }),
+    razorpaySignature: varchar("razorpaySignature", { length: 255 }),
     // Shipping
     shippingContactName: varchar("shippingContactName", { length: 255 }),
     shippingMobileNumber: varchar("shippingMobileNumber", { length: 50 }),
