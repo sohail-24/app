@@ -95,8 +95,8 @@ export default function ProductDetail() {
   }
 
   return (
-    <div className="mx-auto max-w-6xl space-y-5">
-      <section className="flex flex-wrap items-center justify-between gap-3 border-b pb-3">
+    <div className="mx-auto max-w-6xl space-y-5 px-4 md:px-0">
+      <section className="sticky top-0 z-40 bg-background/95 backdrop-blur px-4 py-3 -mx-4 mb-5 border-b md:static md:bg-transparent md:p-0 md:mx-0 md:mb-0 md:border-b md:pb-3 flex flex-wrap items-center justify-between gap-3">
         <Link to="/products" className="inline-flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground">
           <ArrowLeft className="h-4 w-4" />
           Back to Products
@@ -118,7 +118,7 @@ export default function ProductDetail() {
           </div>
         </div>
 
-        <div className="space-y-5 pb-32 md:pb-0">
+        <div className="space-y-5 md:space-y-6">
           <div className="flex flex-wrap gap-2">
             <Badge variant="outline">{product.categoryName ?? "Uncategorized"}</Badge>
             <Badge variant="secondary">{product.grade ?? "Grade A"}</Badge>
@@ -140,7 +140,7 @@ export default function ProductDetail() {
             <p>Grade: {product.grade ?? "Not set"}</p>
           </div>
 
-          <div className="fixed bottom-0 left-0 right-0 z-50 bg-card border-t p-4 flex flex-col gap-3 shadow-[0_-4px_20px_-2px_rgba(0,0,0,0.1)] pb-safe md:static md:shadow-none md:border-none md:p-0 md:bg-transparent">
+          <div className="flex flex-col gap-3 mt-6 md:mt-0">
             <div className="flex flex-col gap-2 md:block md:space-y-2">
               <p className="text-sm font-medium hidden md:block">Quantity</p>
               <div className="flex items-center justify-between md:justify-start gap-4">
@@ -166,7 +166,21 @@ export default function ProductDetail() {
               </div>
             </div>
 
-            <div className="grid gap-3 grid-cols-2 md:mt-4">
+            <div className="flex flex-col gap-3 md:hidden mt-2">
+              <Button variant="outline" className="h-12 bg-card" onClick={() => addProduct("/products")} disabled={isOutOfStock}>
+                <ShoppingCart className="mr-2 h-4 w-4" />
+                {isOutOfStock ? "Out of Stock" : "Add & Continue Shopping"}
+              </Button>
+              <Button variant="outline" className="h-12 bg-card" onClick={() => addProduct("/cart")} disabled={isOutOfStock}>
+                <ShoppingCart className="mr-2 h-4 w-4" />
+                {isOutOfStock ? "Out of Stock" : "Add to Cart & Go to Cart"}
+              </Button>
+              <Button className="h-12 bg-primary hover:bg-primary/90" onClick={() => addProduct("/checkout")} disabled={isOutOfStock}>
+                <Zap className="mr-2 h-4 w-4" />
+                {isOutOfStock ? "Out of Stock" : "Buy Now"}
+              </Button>
+            </div>
+            <div className="hidden md:grid gap-3 grid-cols-2 md:mt-4">
               <Button variant="outline" className="h-12 bg-card" onClick={() => addProduct()} disabled={isOutOfStock}>
                 <ShoppingCart className="mr-2 h-4 w-4" />
                 {isOutOfStock ? "Out of Stock" : "Add to Cart"}
@@ -182,6 +196,9 @@ export default function ProductDetail() {
 
       <DetailSection title="Product Description">
         {product.description ?? "No description has been added for this product."}
+      </DetailSection>
+      <DetailSection title="Product Specifications">
+        No specifications have been added for this product.
       </DetailSection>
       <DetailSection title="Supplier Information">
         <div className="grid gap-2 text-sm sm:grid-cols-2">
