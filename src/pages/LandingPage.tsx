@@ -7,6 +7,7 @@ import {
   Boxes,
   ChevronDown,
   CircleUserRound,
+  ShieldCheck,
   Droplets,
   Image as ImageIcon,
   Leaf,
@@ -217,13 +218,37 @@ export default function LandingPage() {
       </header>
 
       <main className="mx-auto max-w-7xl px-3 py-4 sm:px-4 lg:px-6">
-        <section className="grid gap-2 rounded-lg border border-border bg-card p-3 shadow-sm sm:grid-cols-2 lg:grid-cols-4">
+        {/* Desktop and Tablet view */}
+        <section className="hidden sm:grid gap-2 rounded-lg border border-border bg-card p-3 shadow-sm sm:grid-cols-2 lg:grid-cols-4">
           {infoStrip.map((item) => (
             <div key={item.label} className="flex items-center gap-2 rounded-md bg-primary/10 px-3 py-2 text-sm font-medium text-foreground">
               <item.icon className="h-4 w-4 text-primary" />
               {item.label}
             </div>
           ))}
+        </section>
+
+        {/* Mobile premium feature strip */}
+        <section className="flex sm:hidden items-center justify-between rounded-lg border border-border bg-card/50 px-2 py-2.5 shadow-sm">
+          <div className="flex items-center gap-1 text-primary">
+            <Truck className="h-3.5 w-3.5 shrink-0" />
+            <span className="text-[10px] font-semibold tracking-tight whitespace-nowrap">Same Day</span>
+          </div>
+          <div className="h-1 w-1 rounded-full bg-border/80 shrink-0" />
+          <div className="flex items-center gap-1 text-primary">
+            <ShieldCheck className="h-3.5 w-3.5 shrink-0" />
+            <span className="text-[10px] font-semibold tracking-tight whitespace-nowrap">Verified</span>
+          </div>
+          <div className="h-1 w-1 rounded-full bg-border/80 shrink-0" />
+          <div className="flex items-center gap-1 text-primary">
+            <Package className="h-3.5 w-3.5 shrink-0" />
+            <span className="text-[10px] font-semibold tracking-tight whitespace-nowrap">Bulk</span>
+          </div>
+          <div className="h-1 w-1 rounded-full bg-border/80 shrink-0" />
+          <div className="flex items-center gap-1 text-primary">
+            <Star className="h-3.5 w-3.5 shrink-0" />
+            <span className="text-[10px] font-semibold tracking-tight whitespace-nowrap">Wholesale</span>
+          </div>
         </section>
 
         <section className="mt-5 space-y-3">
