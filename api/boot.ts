@@ -1,3 +1,4 @@
+import { env } from "./lib/env";
 import { Hono } from "hono";
 import { bodyLimit } from "hono/body-limit";
 import type { HttpBindings } from "@hono/node-server";
@@ -5,7 +6,6 @@ import { fetchRequestHandler } from "@trpc/server/adapters/fetch";
 import { appRouter } from "./router";
 import { createContext } from "./context";
 import { authenticateRequest } from "./auth/session";
-import { env } from "./lib/env";
 import { isOwner } from "@contracts/roles";
 
 import { readFileSync } from "node:fs";
