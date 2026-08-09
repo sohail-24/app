@@ -71,6 +71,7 @@ type OrderDetailData = {
   supplierCountry: string | null;
   status: OrderStatus;
   paymentStatus: string;
+  paymentMethod: string;
   deliveryEstimate: DeliveryEstimate | null;
   orderedAt: Date;
   subtotal: unknown;
@@ -280,6 +281,7 @@ export default function OrderDetail() {
             <CardHeader><CardTitle className="flex items-center gap-2 text-base"><FileText className="h-4 w-4" />Order Summary</CardTitle></CardHeader>
             <CardContent className="space-y-3">
               <SummaryRow label="Order Date" value={formatDate(order.orderedAt)} />
+              <SummaryRow label="Payment Method" value={order.paymentMethod === 'cod' ? 'Cash on Delivery' : order.paymentMethod === 'upi' ? 'UPI' : order.paymentMethod} />
               <SummaryRow label="Payment Status" value={order.paymentStatus} />
               {ownerMode ? (
                 <>

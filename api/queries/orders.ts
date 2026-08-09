@@ -168,16 +168,17 @@ export async function findOrderById(orderId: number) {
 
   if (!order) return null;
 
-  const [buyer, supplier, platformAdmin] = await Promise.all([
+  const [buyer, supplier, platformAdmin, buyerUser] = await Promise.all([
     db.query.companies.findFirst({ where: eq(companies.id, order.buyerId) }),
     db.query.companies.findFirst({ where: eq(companies.id, order.supplierId) }),
     db.query.users.findFirst({ where: eq(users.role, "admin") }),
+    db.query.users.findFirst({ where: eq(users.id, order.placedByUserId) }),
   ]);
 
   return {
     ...order,
     buyerName: buyer?.name ?? null,
-    buyerPhone: buyer?.phone ?? null,
+    buyerPhone: order.shippingMobileNumber ?? buyerUser?.phone ?? null,
     buyerAddressLine1: buyer?.addressLine1 ?? null,
     buyerAddressLine2: buyer?.addressLine2 ?? null,
     buyerCity: buyer?.city ?? null,
