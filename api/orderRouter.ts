@@ -9,6 +9,7 @@ import {
   findOrdersByBuyer,
   findOrdersBySupplier,
   findOrderWithDetails,
+  findOrderByRazorpayOrderId,
   orderStatuses,
   orderStatusTransitions,
   type OrderStatus,
@@ -455,13 +456,33 @@ export const orderRouter = createRouter({
           });
         }
 
+        const existingOrder = await findOrderByRazorpayOrderId(input.razorpayOrderId);
+        if (existingOrder) {
+          throw new TRPCError({
+            code: "CONFLICT",
+            message: "An order with this payment ID already exists.",
+          });
+        }
+
         const body = input.razorpayOrderId + "|" + input.razorpayPaymentId;
         const expectedSignature = crypto
           .createHmac("sha256", process.env.RAZORPAY_KEY_SECRET || "")
           .update(body.toString())
           .digest("hex");
 
-        if (expectedSignature !== input.razorpaySignature) {
+        const expectedBuffer = Buffer.from(expectedSignature, "hex");
+        const inputBuffer = Buffer.from(input.razorpaySignature, "hex");
+
+        let isValid = false;
+        try {
+          isValid = crypto.timingSafeEqual(expectedBuffer, inputBuffer);
+        } catch (err) {
+          // Occurs if lengths do not match
+          isValid = false;
+        }
+
+        if (!isValid) {
+          console.error(`Signature mismatch for order: ${input.razorpayOrderId}, user: ${ctx.user.id}`);
           throw new TRPCError({
             code: "BAD_REQUEST",
             message: "Invalid payment signature.",

@@ -161,6 +161,16 @@ export function findOrdersBySupplier(supplierId?: number, filters?: OrderListFil
   return findOrdersForCompany(supplierId, "supplier", filters);
 }
 
+export async function findOrderByRazorpayOrderId(razorpayOrderId: string) {
+  const db = getDb();
+  const rows = await db
+    .select()
+    .from(orders)
+    .where(eq(orders.razorpayOrderId, razorpayOrderId))
+    .limit(1);
+  return rows[0] ?? null;
+}
+
 export async function findOrderById(orderId: number) {
   const db = getDb();
   const rows = await db.select().from(orders).where(eq(orders.id, orderId)).limit(1);
