@@ -24,6 +24,8 @@ export default function Checkout() {
   const utils = trpc.useUtils();
   const cartQuery = trpc.cart.list.useQuery(undefined, { retry: false });
   const addressQuery = trpc.address.list.useQuery(undefined, { retry: false });
+  const [isPaymentInProgress, setIsPaymentInProgress] = useState(false);
+
   const createRazorpayOrder = trpc.order.createRazorpayOrder.useMutation({
     onError: (error) => toast.error(error.message || "Failed to initialize payment."),
   });
@@ -145,73 +147,83 @@ export default function Checkout() {
     }
 
     if (form.paymentMethod === "upi") {
-      const razorpayOrder = await createRazorpayOrder.mutateAsync({
-        shippingState: form.state,
-      });
+      setIsPaymentInProgress(true);
+      try {
+        const razorpayOrder = await createRazorpayOrder.mutateAsync({
+          shippingState: form.state,
+        });
 
-      const scriptLoaded = await new Promise((resolve) => {
-        if (document.querySelector('script[src="https://checkout.razorpay.com/v1/checkout.js"]')) {
-          resolve(true);
+        const scriptLoaded = await new Promise((resolve) => {
+          if (document.querySelector('script[src="https://checkout.razorpay.com/v1/checkout.js"]')) {
+            resolve(true);
+            return;
+          }
+          const script = document.createElement("script");
+          script.src = "https://checkout.razorpay.com/v1/checkout.js";
+          script.onload = () => resolve(true);
+          script.onerror = () => resolve(false);
+          document.body.appendChild(script);
+        });
+
+        if (!scriptLoaded) {
+          toast.error("Failed to load Razorpay checkout. Please check your connection.");
+          setIsPaymentInProgress(false);
           return;
         }
-        const script = document.createElement("script");
-        script.src = "https://checkout.razorpay.com/v1/checkout.js";
-        script.onload = () => resolve(true);
-        script.onerror = () => resolve(false);
-        document.body.appendChild(script);
-      });
 
-      if (!scriptLoaded) {
-        toast.error("Failed to load Razorpay checkout. Please check your connection.");
-        return;
-      }
-
-      const options = {
-        key: razorpayOrder.keyId || "rzp_test_invalid",
-        amount: razorpayOrder.amount,
-        currency: razorpayOrder.currency,
-        name: "FreshFlow",
-        description: "Order Payment",
-        order_id: razorpayOrder.id,
-        prefill: {
-          name: form.contactName,
-          contact: form.mobileNumber,
-          email: authQuery.data?.email || "",
-        },
-        theme: {
-          color: "#059669",
-        },
-        handler: function (response: any) {
-          createOrder.mutate({
-            shippingContactName: form.contactName,
-            shippingMobileNumber: form.mobileNumber,
-            shippingAddressLine1: form.address,
-            shippingAddressLine2: form.addressLine2 || undefined,
-            shippingLandmark: form.landmark || undefined,
-            shippingAreaLocality: form.areaLocality || undefined,
-            shippingCity: form.city,
-            shippingState: form.state,
-            shippingCountry: "IND",
-            shippingMethod: form.slot || undefined,
-            buyerNotes: form.notes || undefined,
-            paymentMethod: "upi",
-            razorpayOrderId: response.razorpay_order_id,
-            razorpayPaymentId: response.razorpay_payment_id,
-            razorpaySignature: response.razorpay_signature,
-          });
-        },
-        modal: {
-          ondismiss: function () {
-            toast.error("Payment cancelled.");
+        const options = {
+          key: razorpayOrder.keyId || "rzp_test_invalid",
+          amount: razorpayOrder.amount,
+          currency: razorpayOrder.currency,
+          name: "FreshFlow",
+          description: "Order Payment",
+          order_id: razorpayOrder.id,
+          prefill: {
+            name: form.contactName,
+            contact: form.mobileNumber,
+            email: authQuery.data?.email || "",
           },
-        },
-      };
+          theme: {
+            color: "#059669",
+          },
+          handler: function (response: any) {
+            createOrder.mutate({
+              shippingContactName: form.contactName,
+              shippingMobileNumber: form.mobileNumber,
+              shippingAddressLine1: form.address,
+              shippingAddressLine2: form.addressLine2 || undefined,
+              shippingLandmark: form.landmark || undefined,
+              shippingAreaLocality: form.areaLocality || undefined,
+              shippingCity: form.city,
+              shippingState: form.state,
+              shippingCountry: "IND",
+              shippingMethod: form.slot || undefined,
+              buyerNotes: form.notes || undefined,
+              paymentMethod: "upi",
+              razorpayOrderId: response.razorpay_order_id,
+              razorpayPaymentId: response.razorpay_payment_id,
+              razorpaySignature: response.razorpay_signature,
+            }, {
+              onSettled: () => setIsPaymentInProgress(false)
+            });
+          },
+          modal: {
+            ondismiss: function () {
+              setIsPaymentInProgress(false);
+              toast.error("Payment cancelled.");
+            },
+          },
+        };
 
-      const razorpayInstance = new (window as any).Razorpay(options);
-      razorpayInstance.on('payment.failed', function (response: any) {
-        toast.error(`Payment failed: ${response.error.description}`);
-      });
-      razorpayInstance.open();
+        const razorpayInstance = new (window as any).Razorpay(options);
+        razorpayInstance.on('payment.failed', function (response: any) {
+          setIsPaymentInProgress(false);
+          toast.error(`Payment failed: ${response.error.description}`);
+        });
+        razorpayInstance.open();
+      } catch (err) {
+        setIsPaymentInProgress(false);
+      }
     } else {
       createOrder.mutate({
         shippingContactName: form.contactName,
@@ -345,8 +357,8 @@ export default function Checkout() {
               <Checkbox checked={form.agreeTerms} onCheckedChange={(checked) => setForm({ ...form, agreeTerms: checked === true })} />
               I agree to the Terms & Conditions.
             </Label>
-            <Button type="submit" className="h-11 w-full bg-emerald-600 hover:bg-emerald-700" disabled={createOrder.isPending || createRazorpayOrder.isPending || quoteQuery.isLoading || deliveryUnavailable || !form.confirmAddress || !form.agreeTerms}>
-              {(createOrder.isPending || createRazorpayOrder.isPending) && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+            <Button type="submit" className="h-11 w-full bg-emerald-600 hover:bg-emerald-700" disabled={createOrder.isPending || createRazorpayOrder.isPending || isPaymentInProgress || quoteQuery.isLoading || deliveryUnavailable || !form.confirmAddress || !form.agreeTerms}>
+              {(createOrder.isPending || createRazorpayOrder.isPending || isPaymentInProgress) && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
               {form.paymentMethod === "upi" ? "Pay Now" : "Place Order"}
             </Button>
           </CardContent>
