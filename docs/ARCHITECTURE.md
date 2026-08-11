@@ -1,4 +1,6 @@
-# FreshFlow Architecture
+# AM Fruits (FreshFlow) Architecture
+
+*Note: FreshFlow is the internal project/platform name; AM Fruits is the current public business/product brand.*
 
 ## Project Overview
 
@@ -238,6 +240,58 @@ FreshFlow is containerized following a Platform Engineering Phase 1 approach. Pr
 3. The Node App starts, running Drizzle migrations programmatically in `api/boot.ts` before listening for requests.
 4. Nginx waits for the App container health check before serving traffic.
 
+
+### Network Request Flow
+
+```text
+Browser
+    ↓
+Cloudflare/DNS
+    ↓
+Nginx HTTPS
+    ↓
+React SPA
+    ↓
+/api/*
+    ↓
+Hono/tRPC
+    ↓
+PostgreSQL
+```
+
+### Razorpay Payment Flow
+
+```text
+Buyer
+ ↓
+Checkout
+ ↓
+Backend creates Razorpay order
+ ↓
+Razorpay Checkout
+ ↓
+Payment
+ ↓
+Frontend receives Razorpay response
+ ↓
+Backend verifies payment signature
+ ↓
+Order creation
+ ↓
+Database
+```
+
+### Payment Security Improvements
+
+The payment flow has been production-hardened with the following features:
+
+- **Razorpay Signature Verification:** Verifies the payment locally on the backend using the server-side Razorpay secret.
+- **HMAC-SHA256:** Cryptographically hashes the payment payload.
+- **Timing-safe Signature Comparison:** Uses `crypto.timingSafeEqual` to prevent timing attacks during signature validation.
+- **Duplicate Payment/Order Protection (Idempotency):** Uses the `razorpayOrderId` to ensure multiple callbacks do not result in duplicate application orders.
+- **Frontend Payment-in-progress State:** Prevents repeated checkout submissions by disabling checkout buttons while the Razorpay modal is open.
+- **Failed/Cancelled Payment Handling:** Gracefully captures errors and failed states from the Razorpay modal.
+
 ## Current Features
 
 - Email/password auth.
@@ -269,7 +323,6 @@ FreshFlow is containerized following a Platform Engineering Phase 1 approach. Pr
 - Import/export and bulk-edit buttons are UI affordances and need full workflows.
 - Customer, invoice, delivery, warehouse, and platform settings pages are not yet fully separated route modules.
 - Order analytics use available order data plus placeholder trend data where historical aggregates do not yet exist.
-- Payment processing is not implemented.
 - Multi-tenant isolation is modeled through companies but not yet hardened with tenant middleware across every query.
 
 ## Future Architecture

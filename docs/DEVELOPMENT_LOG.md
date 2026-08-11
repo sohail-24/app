@@ -1,3 +1,30 @@
+## 2026-08-10 Production-Hardening Razorpay Payment Flow
+
+### Summary
+Hardened the Razorpay payment integration to ensure production-level security, reliability, and idempotency during order creation. Addressed critical vulnerabilities related to payment signature verification and duplicate order generation.
+
+### Problem: Duplicate Orders
+- **Issue:** Duplicate payment callbacks or impatient user clicks could potentially create duplicate orders for the same transaction.
+- **Solution:** Added a server-side idempotency check querying the database for existing `razorpayOrderId` before generating an order.
+
+### Problem: Insecure Signature Comparison
+- **Issue:** Payment signature comparison used normal string comparison, exposing the system to potential timing attacks.
+- **Solution:** Changed verification logic to use Node.js `crypto.timingSafeEqual` with an HMAC-SHA256 generated signature.
+
+### Problem: Unsafe UI State During Checkout
+- **Issue:** The checkout button could become available or be clicked multiple times while the Razorpay modal/payment flow was still active.
+- **Solution:** Introduced an `isPaymentInProgress` state to the checkout component, disabling submissions while the payment flow is processing. Handled Razorpay closure/failure callbacks gracefully.
+
+### Security & Reliability Improvements
+- **Security:** Timing-safe equality checks, server-side secret management, HMAC-SHA256 payload verification.
+- **Reliability:** Idempotent order creation prevents double-charging/duplicate shipments. Accurate loading states improve UI resiliency during third-party interactions.
+
+### Verification
+- `npm test` passed.
+- `npm run build` passed.
+- Code review completed.
+- Razorpay hardening work committed and pushed.
+
 ## 2026-08-05 Platform Engineering Phase 1 & Documentation Sync
 
 ### Summary
