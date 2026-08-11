@@ -7,6 +7,7 @@ import { addGuestCartItem } from "@/lib/guestCart";
 import { formatCurrency, toNumber, unitLabels } from "@/lib/i18n";
 import { getAppRole } from "@/lib/roles";
 import { MetricCard } from "@/components/freshflow/MetricCard";
+import { QuantitySelector } from "@/components/freshflow/QuantitySelector";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -20,8 +21,6 @@ import {
   ArrowLeft,
   Eye,
   Image as ImageIcon,
-  Minus,
-  Plus,
   Package,
   Search,
   ShoppingCart,
@@ -333,21 +332,14 @@ function ProductCard({ product, onAdd, pending }: { product: CatalogProduct; onA
           </div>
           {product.rating && <div className="flex items-center gap-0.5"><Star className="h-3 w-3 fill-primary text-primary" /> {product.rating}</div>}
         </div>
-        <div className="flex items-center justify-between rounded-lg border bg-muted/50 p-1 sm:p-2">
-          <Button variant="outline" size="icon" className="h-7 w-7 sm:h-10 sm:w-10 bg-card rounded-md shadow-sm transition-transform active:scale-95" onClick={() => setQuantity(Math.max(moq, quantity - 1))} disabled={quantity <= moq || isOutOfStock}>
-            <Minus className="h-3 w-3 sm:h-4 sm:w-4" />
-          </Button>
-          <span className="min-w-12 sm:min-w-20 text-center font-semibold text-xs sm:text-sm">{quantity} {unit}</span>
-          <Button variant="outline" size="icon" className="h-7 w-7 sm:h-10 sm:w-10 bg-card rounded-md shadow-sm transition-transform active:scale-95" onClick={() => {
-            if (quantity >= stock) {
-              toast.error(`Only ${stock} available.`);
-            } else {
-              setQuantity(quantity + 1);
-            }
-          }} disabled={isOutOfStock}>
-            <Plus className="h-3 w-3 sm:h-4 sm:w-4" />
-          </Button>
-        </div>
+        <QuantitySelector
+          quantity={quantity}
+          setQuantity={setQuantity}
+          moq={moq}
+          stock={stock}
+          isOutOfStock={isOutOfStock}
+          unitLabel={unit}
+        />
         <div className="flex items-center justify-between sm:block">
           <p className="font-semibold text-xs sm:text-sm hidden sm:block">Total: {formatCurrency(price * quantity)}</p>
         </div>
