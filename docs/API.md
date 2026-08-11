@@ -317,6 +317,30 @@ Project-wide standards should never be duplicated inside module documentation.
 
 ---
 
+
+# Order & Payment Flow
+
+The order creation process integrates securely with Razorpay.
+
+## 1. Creating a Razorpay Order
+- **Procedure:** `createRazorpayOrder`
+- **Purpose:** Generates a short-lived `razorpay_order_id` intended for the frontend checkout.
+- **Rules:** The amount and currency are securely calculated on the backend based on the user's cart.
+
+## 2. Payment Verification
+- **Procedure:** `create` (Order Creation)
+- **Purpose:** Finalizes the application order only if the payment signature is valid.
+- **Verification Inputs:**
+  - `razorpayOrderId`
+  - `razorpayPaymentId`
+  - `razorpaySignature`
+- **Security:** The backend securely verifies the `razorpaySignature` using `crypto.timingSafeEqual` against a locally computed HMAC-SHA256 hash using the server-side Razorpay secret (e.g., `RAZORPAY_KEY_SECRET`).
+
+## 3. Idempotency & Duplicate Protection
+If a `razorpayOrderId` has already been processed and an application order exists for it, another order must not be created.
+- **Behavior:** The API queries the database for the provided `razorpayOrderId`. If found, a duplicate-payment conflict error is raised to prevent duplicate orders.
+
+
 # Future Improvements
 
 Future versions may include:
