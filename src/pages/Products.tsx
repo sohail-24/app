@@ -317,22 +317,21 @@ function ProductCard({ product, onAdd, pending }: { product: CatalogProduct; onA
   return (
     <Card className="overflow-hidden rounded-xl shadow-sm hover:shadow-premium sm:hover:-translate-y-1 transition-all duration-300 border-border">
       <Link to={`/products/${product.slug}`} className="block relative">
-        <div className="flex aspect-[4/3] sm:aspect-square items-center justify-center bg-muted text-lg font-semibold text-muted-foreground">
+        <div className="flex aspect-[3/2] items-center justify-center bg-muted text-lg font-semibold text-muted-foreground">
           {product.image && !imageFailed ? <img src={product.image} alt={product.name} className="h-full w-full object-cover" onError={() => setImageFailed(true)} /> : <ImageIcon className="h-8 w-8 sm:h-9 sm:w-9" />}
         </div>
       </Link>
-      <CardContent className="space-y-2 sm:space-y-3 p-3 sm:p-4 text-xs sm:text-sm">
-        <div className="min-h-[48px] sm:min-h-[62px]">
-          <Link to={`/products/${product.slug}`} className="text-sm sm:text-base font-semibold hover:text-primary line-clamp-2">{product.name}</Link>
+      <CardContent className="space-y-1.5 p-2 sm:p-3 text-xs sm:text-sm">
+        <div className="min-h-[40px] sm:min-h-[48px]">
+          <Link to={`/products/${product.slug}`} className="text-sm font-semibold hover:text-primary line-clamp-2">{product.name}</Link>
           <p className="mt-0.5 sm:mt-1 truncate text-[10px] sm:text-xs text-muted-foreground">{product.supplierName ?? "Supplier"}</p>
         </div>
         <div className="grid gap-0.5 sm:gap-1 text-[10px] sm:text-xs text-muted-foreground">
-          <p><span className="text-sm sm:text-base font-bold text-primary">{formatCurrency(price)}</span> / {unitLabels[unit] ?? unit}</p>
-          <div className="grid grid-cols-2 gap-x-2">
+          <p><span className="text-sm font-bold text-primary">{formatCurrency(price)}</span> / {unitLabels[unit] ?? unit}</p>
+          <div className="grid grid-cols-1 gap-x-2">
             <span>Stock: {product.stock ?? "Not set"}</span>
-            <span>MOQ: {moq} {unit}</span>
           </div>
-          {product.rating && <p>Rating: ★ {product.rating}</p>}
+          {product.rating && <div className="flex items-center gap-0.5"><Star className="h-3 w-3 fill-primary text-primary" /> {product.rating}</div>}
         </div>
         <div className="flex items-center justify-between rounded-lg border bg-muted/50 p-1 sm:p-2">
           <Button variant="outline" size="icon" className="h-7 w-7 sm:h-10 sm:w-10 bg-card rounded-md shadow-sm transition-transform active:scale-95" onClick={() => setQuantity(Math.max(moq, quantity - 1))} disabled={quantity <= moq || isOutOfStock}>

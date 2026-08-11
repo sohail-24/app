@@ -190,7 +190,7 @@ function AppLayoutContent() {
 
   const company = companyQuery.data ?? null;
   const role = getAppRole(user);
-  const businessName = company?.name ?? "FreshFlow";
+  const businessName = company?.name ?? "AM Fruits";
   const initials = (user?.name ?? businessName)
     .split(" ")
     .map((part) => part[0])
@@ -265,8 +265,8 @@ function AppLayoutContent() {
         <SidebarFooter className="border-t border-sidebar-border p-3">
           {user ? (
             <UserMenu
-              initials={initials || "FF"}
-              userName={user.name ?? "FreshFlow User"}
+              initials={initials || "AM"}
+              userName={user.name ?? "AM Fruits User"}
               userDetail={user.email ?? user.phone ?? getRoleLabel(role)}
               role={role}
               onLogout={logout}
@@ -297,7 +297,7 @@ function AppLayoutContent() {
           <div className="relative hidden min-w-[260px] max-w-xl flex-1 md:block">
             <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
             <Input
-              aria-label="Search FreshFlow"
+              aria-label="Search AM Fruits"
               placeholder={role === "buyer" ? "Search products, suppliers, orders..." : "Search products, orders, inventory..."}
               className="h-9 border-input bg-card pl-9 pr-10"
             />
