@@ -156,10 +156,8 @@ export default function LandingPage() {
           <div className="grid gap-3 md:grid-cols-[auto_minmax(280px,1fr)_auto] md:items-center">
             <div className="flex items-center justify-between">
               <Link to="/" className="flex w-fit items-center gap-2">
-                <span className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary text-white">
-                  <Leaf className="h-5 w-5" />
-                </span>
-                <span className="text-xl font-bold tracking-tight">FreshFlow</span>
+                <img src="/branding/am-fruits-logo.png" alt="AM Fruits" className="h-10 w-auto" />
+                <span className="text-xl font-bold tracking-tight">AM Fruits</span>
               </Link>
               <Link
                 to="/orders"
@@ -497,7 +495,7 @@ function WholesaleProductCard({
   return (
     <Card className="overflow-hidden rounded-xl border-border bg-card shadow-sm hover:shadow-premium hover:-translate-y-1 transition-all duration-300">
       <Link to={`/products/${product.slug}`} className="block relative">
-        <div className="flex aspect-square items-center justify-center bg-muted text-muted-foreground">
+        <div className="flex aspect-[3/2] items-center justify-center bg-muted text-muted-foreground">
           {product.image && !imageFailed ? (
             <img src={product.image} alt={product.name} className="h-full w-full object-cover" onError={() => setImageFailed(true)} />
           ) : (
@@ -510,8 +508,8 @@ function WholesaleProductCard({
           </Badge>
         )}
       </Link>
-      <CardContent className="space-y-3 p-4">
-        <div className="min-h-[62px]">
+      <CardContent className="space-y-2 p-3">
+        <div className="min-h-[48px]">
           <Link to={`/products/${product.slug}`} className="line-clamp-2 text-base font-semibold leading-snug hover:text-primary">
             {product.name}
           </Link>
@@ -520,14 +518,13 @@ function WholesaleProductCard({
 
         <div className="space-y-2 text-sm">
           <div className="flex flex-wrap items-baseline gap-2">
-            <span className="text-lg font-bold text-primary">{formatCurrency(price)}</span>
+            <span className="text-base font-bold text-primary">{formatCurrency(price)}</span>
             <span className="text-muted-foreground">/ {unitLabel}</span>
             {compareAt > price && <span className="text-xs text-muted-foreground line-through">{formatCurrency(compareAt)}</span>}
           </div>
-          <div className="grid grid-cols-2 gap-x-2 gap-y-1 text-xs text-muted-foreground">
-            <span>MOQ: {moq} {unitLabel}</span>
+          <div className="grid grid-cols-1 gap-y-1 text-xs text-muted-foreground">
             <span>Available Stock: {availableStock}</span>
-            <span>Rating: {product.rating ?? "4.8"}</span>
+            <span className="flex items-center gap-0.5"><Star className="h-3 w-3 fill-primary text-primary" /> {product.rating ?? "4.8"}</span>
             <span>{product.categoryName ?? "Wholesale"}</span>
           </div>
         </div>
