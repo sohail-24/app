@@ -32,6 +32,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
+import { QuantitySelector } from "@/components/freshflow/QuantitySelector";
 
 type MarketplaceProduct = {
   id: number;
@@ -489,6 +490,9 @@ function WholesaleProductCard({
   const moq = product.minimumOrderQuantity ?? 1;
   const unit = product.unitType ?? "kg";
   const availableStock = product.stock ?? (product.status === "active" ? "Available" : "Limited");
+  const stock = typeof product.stock === 'number' ? product.stock : 0;
+  const isOutOfStock = stock < moq && typeof product.stock === 'number';
+  const [quantity, setQuantity] = useState(moq);
   const [imageFailed, setImageFailed] = useState(false);
   const unitLabel = unitLabels[unit] ?? unit;
 
@@ -529,12 +533,20 @@ function WholesaleProductCard({
           </div>
         </div>
 
-        <div className="pt-2">
+        <div className="flex flex-col gap-2 pt-2">
+          <QuantitySelector
+            quantity={quantity}
+            setQuantity={setQuantity}
+            moq={moq}
+            stock={stock}
+            isOutOfStock={isOutOfStock}
+            unitLabel={unitLabel}
+          />
           <Button
             type="button"
             className="w-full bg-primary hover:bg-primary/90"
-            onClick={() => onAdd(product, moq)}
-            disabled={pending}
+            onClick={() => onAdd(product, quantity)}
+            disabled={pending || isOutOfStock}
           >
             <ShoppingCart className="mr-2 h-4 w-4" />
             Add To Cart
