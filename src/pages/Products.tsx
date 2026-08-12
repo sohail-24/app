@@ -22,6 +22,7 @@ import {
   Eye,
   Image as ImageIcon,
   Package,
+  Plus,
   Search,
   ShoppingCart,
   SlidersHorizontal,
