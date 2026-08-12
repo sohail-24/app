@@ -390,12 +390,12 @@ export default function Profile() {
                   Choose Avatar
                 </Button>
               </DialogTrigger>
-              <DialogContent className="max-w-md">
+              <DialogContent className="max-w-md md:max-w-2xl">
                 <DialogHeader>
                   <DialogTitle>Choose Avatar</DialogTitle>
                   <DialogDescription>Select an avatar for your profile.</DialogDescription>
                 </DialogHeader>
-                <div className="grid grid-cols-3 gap-4 py-2 sm:grid-cols-4">
+                <div className="grid grid-cols-2 gap-4 py-2 sm:grid-cols-4 md:grid-cols-5">
                   <button
                     type="button"
                     className={`flex flex-col items-center gap-2 rounded-lg border p-2 transition-colors hover:bg-accent ${profile.avatar === null ? "border-primary bg-primary/5" : ""}`}
