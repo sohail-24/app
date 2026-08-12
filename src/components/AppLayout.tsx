@@ -2,7 +2,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { LOGIN_PATH } from "@/const";
 import { getAppRole, getRoleLabel, type AppRole } from "@/lib/roles";
 import { trpc } from "@/providers/trpc";
-import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -269,6 +269,7 @@ function AppLayoutContent() {
               userName={user.name ?? "AM Fruits User"}
               userDetail={user.email ?? user.phone ?? getRoleLabel(role)}
               role={role}
+              avatar={user.avatar}
               onLogout={logout}
             />
           ) : (
@@ -321,6 +322,7 @@ function AppLayoutContent() {
               userName={user?.name ?? "Guest"}
               userDetail={user?.email ?? user?.phone ?? "Not signed in"}
               role={role}
+              avatar={user?.avatar}
               onLogout={logout}
               compact
             />
@@ -392,6 +394,7 @@ function UserMenu({
   userName,
   userDetail,
   role,
+  avatar,
   onLogout,
   compact = false,
 }: {
@@ -399,6 +402,7 @@ function UserMenu({
   userName: string;
   userDetail: string;
   role: AppRole;
+  avatar?: string | null;
   onLogout: () => void;
   compact?: boolean;
 }) {
@@ -409,6 +413,7 @@ function UserMenu({
       <DropdownMenuTrigger asChild>
         <button className="flex min-w-0 items-center gap-2 rounded-lg p-1.5 text-left transition-colors hover:bg-accent erp-focus">
           <Avatar className="h-8 w-8 border">
+            <AvatarImage key={avatar ?? "fallback"} src={avatar ?? undefined} alt={userName} />
             <AvatarFallback className="bg-primary text-xs font-semibold text-primary-foreground">
               {initials}
             </AvatarFallback>
