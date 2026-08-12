@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 import { useTheme } from "next-themes";
 import { trpc } from "@/providers/trpc";
@@ -6,17 +6,6 @@ import { getAppRole, getRoleLabel } from "@/lib/roles";
 import { formatDate } from "@/lib/i18n";
 import { isValidIndianMobileNumber, normalizeFrontendMobileNumber } from "@/lib/utils";
 import { indianStates } from "@/lib/freshflowData";
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-  AlertDialogTrigger,
-} from "@/components/ui/alert-dialog";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
@@ -37,13 +26,14 @@ import { Label } from "@/components/ui/label";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
-import { AlertCircle, Camera, KeyRound, Save, Trash2, Home, Briefcase, MapPin, Plus, Edit } from "lucide-react";
+import { AlertCircle, Check, KeyRound, Save, Trash2, Home, Briefcase, MapPin, Plus, Edit } from "lucide-react";
 
 type Gender = "male" | "female" | "other" | "prefer_not_to_say";
 type ThemePreference = "system" | "light" | "dark";
 
 type ProfileForm = {
   name: string;
+  email: string;
   phone: string;
   dateOfBirth: string;
   gender: Gender | "";
@@ -52,6 +42,7 @@ type ProfileForm = {
 
 const emptyForm: ProfileForm = {
   name: "",
+  email: "",
   phone: "",
   dateOfBirth: "",
   gender: "",
@@ -270,8 +261,8 @@ function AddressBook() {
 export default function Profile() {
   const utils = trpc.useUtils();
   const { setTheme } = useTheme();
-  const fileInputRef = useRef<HTMLInputElement | null>(null);
   const [form, setForm] = useState<ProfileForm>(emptyForm);
+  const [avatarDialogOpen, setAvatarDialogOpen] = useState(false);
   const [passwordOpen, setPasswordOpen] = useState(false);
   const [passwordForm, setPasswordForm] = useState({
     currentPassword: "",
@@ -280,12 +271,14 @@ export default function Profile() {
   });
 
   const profileQuery = trpc.profile.current.useQuery(undefined, { retry: false });
+  const avatarQuery = trpc.profile.avatars.useQuery(undefined, { retry: false });
   const profile = profileQuery.data;
 
   useEffect(() => {
     if (!profile) return;
     setForm({
       name: profile.name ?? "",
+      email: profile.email ?? "",
       phone: profile.phone?.replace(/^\+91/, "") ?? "",
       dateOfBirth: profile.dateOfBirth ? new Date(profile.dateOfBirth).toISOString().slice(0, 10) : "",
       gender: (profile.gender as Gender | null) ?? "",
@@ -297,14 +290,10 @@ export default function Profile() {
     if (!profile) return emptyForm;
     return {
       name: profile.name ?? "",
-      phone: profile.phone ?? "",
+      email: profile.email ?? "",
+      phone: profile.phone?.replace(/^\+91/, "") ?? "",
       dateOfBirth: profile.dateOfBirth ? new Date(profile.dateOfBirth).toISOString().slice(0, 10) : "",
       gender: (profile.gender as Gender | null) ?? "",
-      addressLine1: profile.addressLine1 ?? "",
-      city: profile.city ?? "",
-      state: profile.state ?? "",
-      country: profile.country ?? "India",
-      postalCode: profile.postalCode ?? "",
       themePreference: (profile.themePreference as ThemePreference | null) ?? "system",
     };
   }, [profile]);
@@ -312,27 +301,12 @@ export default function Profile() {
 
   const updateProfile = trpc.profile.update.useMutation({
     onSuccess: async (updated) => {
+      utils.profile.current.setData(undefined, updated);
       await Promise.all([utils.profile.current.invalidate(), utils.auth.me.invalidate()]);
       setTheme(updated.themePreference ?? "system");
       toast.success("Profile updated.");
     },
     onError: (error) => toast.error(error.message || "Could not update profile."),
-  });
-
-  const uploadAvatar = trpc.profile.uploadAvatar.useMutation({
-    onSuccess: async () => {
-      await Promise.all([utils.profile.current.invalidate(), utils.auth.me.invalidate()]);
-      toast.success("Profile photo updated.");
-    },
-    onError: (error) => toast.error(error.message || "Could not upload avatar."),
-  });
-
-  const deleteAvatar = trpc.profile.deleteAvatar.useMutation({
-    onSuccess: async () => {
-      await Promise.all([utils.profile.current.invalidate(), utils.auth.me.invalidate()]);
-      toast.success("Profile photo removed.");
-    },
-    onError: (error) => toast.error(error.message || "Could not remove avatar."),
   });
 
   const changePassword = trpc.profile.changePassword.useMutation({
@@ -373,24 +347,19 @@ export default function Profile() {
       toast.error("Enter a valid 10-digit Indian mobile number.");
       return;
     }
+    const email = form.email.trim();
+    if (profile.email === null && email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+      toast.error("Enter a valid email address.");
+      return;
+    }
     updateProfile.mutate({
       name: form.name.trim(),
+      ...(profile.email === null && email ? { email } : {}),
       phone: form.phone ? normalizeFrontendMobileNumber(form.phone) : null,
       dateOfBirth: form.dateOfBirth || null,
       gender: form.gender || null,
       themePreference: form.themePreference,
     });
-  }
-
-  function handleAvatarFile(file?: File) {
-    if (!file) return;
-    const reader = new FileReader();
-    reader.onload = () => {
-      if (typeof reader.result === "string") {
-        uploadAvatar.mutate({ avatar: reader.result });
-      }
-    };
-    reader.readAsDataURL(file);
   }
 
   return (
@@ -415,37 +384,59 @@ export default function Profile() {
             </div>
           </div>
           <div className="flex flex-wrap justify-center gap-2 sm:justify-end">
-            <input
-              ref={fileInputRef}
-              type="file"
-              accept="image/png,image/jpeg,image/webp"
-              className="hidden"
-              onChange={(event) => handleAvatarFile(event.target.files?.[0])}
-            />
-            <Button variant="outline" onClick={() => fileInputRef.current?.click()} disabled={uploadAvatar.isPending}>
-              <Camera className="mr-2 h-4 w-4" />
-              Upload Photo
-            </Button>
-            {profile.avatar && (
-              <AlertDialog>
-                <AlertDialogTrigger asChild>
-                  <Button variant="outline" disabled={deleteAvatar.isPending}>
-                    <Trash2 className="mr-2 h-4 w-4" />
-                    Remove Photo
-                  </Button>
-                </AlertDialogTrigger>
-                <AlertDialogContent>
-                  <AlertDialogHeader>
-                    <AlertDialogTitle>Remove profile photo?</AlertDialogTitle>
-                    <AlertDialogDescription>The default avatar will be displayed automatically.</AlertDialogDescription>
-                  </AlertDialogHeader>
-                  <AlertDialogFooter>
-                    <AlertDialogCancel>Cancel</AlertDialogCancel>
-                    <AlertDialogAction onClick={() => deleteAvatar.mutate()}>Remove Photo</AlertDialogAction>
-                  </AlertDialogFooter>
-                </AlertDialogContent>
-              </AlertDialog>
-            )}
+            <Dialog open={avatarDialogOpen} onOpenChange={setAvatarDialogOpen}>
+              <DialogTrigger asChild>
+                <Button variant="outline" disabled={updateProfile.isPending || avatarQuery.isLoading}>
+                  Choose Avatar
+                </Button>
+              </DialogTrigger>
+              <DialogContent className="max-w-md">
+                <DialogHeader>
+                  <DialogTitle>Choose Avatar</DialogTitle>
+                  <DialogDescription>Select an avatar for your profile.</DialogDescription>
+                </DialogHeader>
+                <div className="grid grid-cols-3 gap-4 py-2 sm:grid-cols-4">
+                  <button
+                    type="button"
+                    className={`flex flex-col items-center gap-2 rounded-lg border p-2 transition-colors hover:bg-accent ${profile.avatar === null ? "border-primary bg-primary/5" : ""}`}
+                    onClick={() => {
+                      updateProfile.mutate({ avatar: null });
+                      setAvatarDialogOpen(false);
+                    }}
+                    disabled={updateProfile.isPending}
+                  >
+                    <Avatar className="h-14 w-14 border">
+                      <AvatarFallback>{initials}</AvatarFallback>
+                    </Avatar>
+                    <span className="flex items-center gap-1 text-xs font-medium">
+                      {profile.avatar === null && <Check className="h-3.5 w-3.5" />}
+                      Default
+                    </span>
+                  </button>
+                  {(avatarQuery.data ?? []).map((avatarPath) => (
+                    <button
+                      type="button"
+                      key={avatarPath}
+                      className={`flex flex-col items-center gap-2 rounded-lg border p-2 transition-colors hover:bg-accent ${profile.avatar === avatarPath ? "border-primary bg-primary/5" : ""}`}
+                      onClick={() => {
+                        updateProfile.mutate({ avatar: avatarPath });
+                        setAvatarDialogOpen(false);
+                      }}
+                      disabled={updateProfile.isPending}
+                    >
+                      <Avatar className="h-14 w-14 border">
+                        <AvatarImage src={avatarPath} alt={formatAvatarName(avatarPath)} />
+                        <AvatarFallback>{formatAvatarName(avatarPath).slice(0, 2).toUpperCase()}</AvatarFallback>
+                      </Avatar>
+                      <span className="flex items-center gap-1 text-xs font-medium">
+                        {profile.avatar === avatarPath && <Check className="h-3.5 w-3.5" />}
+                        {formatAvatarName(avatarPath)}
+                      </span>
+                    </button>
+                  ))}
+                </div>
+              </DialogContent>
+            </Dialog>
           </div>
         </CardContent>
       </Card>
@@ -454,14 +445,21 @@ export default function Profile() {
         <Card>
           <CardHeader>
             <CardTitle className="text-base">Personal Information</CardTitle>
-            <CardDescription>Email is read-only in Version 1.0.</CardDescription>
+            <CardDescription>{profile.email !== null ? "Email cannot be changed once it is set." : "Add an email address to your account."}</CardDescription>
           </CardHeader>
           <CardContent className="grid gap-4 sm:grid-cols-2">
             <Field label="Full Name" required>
               <Input value={form.name} onChange={(event) => setForm({ ...form, name: event.target.value })} />
             </Field>
             <Field label="Email">
-              <Input value={profile.email ?? ""} readOnly className="bg-muted/40" />
+              <Input
+                type="email"
+                value={form.email}
+                readOnly={profile.email !== null}
+                onChange={(event) => setForm({ ...form, email: event.target.value })}
+                placeholder={profile.email === null ? "you@example.com" : undefined}
+                className={profile.email !== null ? "bg-muted/40" : undefined}
+              />
             </Field>
             <Field label="Mobile Number">
               <Input value={form.phone} onChange={(event) => setForm({ ...form, phone: event.target.value })} placeholder="98765 43210" />
@@ -565,6 +563,13 @@ export default function Profile() {
       </Card>
     </div>
   );
+}
+
+function formatAvatarName(path: string) {
+  return (path.split("/").pop() ?? "Avatar")
+    .replace(/\.[^.]+$/, "")
+    .replace(/[-_]+/g, " ")
+    .replace(/\b\w/g, (letter) => letter.toUpperCase());
 }
 
 function Field({ label, required, children }: { label: string; required?: boolean; children: React.ReactNode }) {
