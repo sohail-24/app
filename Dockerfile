@@ -31,6 +31,8 @@ RUN npm ci --omit=dev
 
 # Copy built backend code from builder stage
 COPY --from=builder /app/dist/boot.js ./dist/boot.js
+# The profile avatar query discovers the local assets at runtime.
+COPY --from=builder /app/dist/public/avatars ./dist/public/avatars
 # Drizzle config and DB schema/migrations if needed for runtime operations
 COPY --from=builder /app/db ./db
 COPY --from=builder /app/drizzle.config.ts ./
