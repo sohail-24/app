@@ -49,6 +49,14 @@ const emptyForm: ProfileForm = {
   themePreference: "system",
 };
 
+// Bump this when the local avatar artwork changes. The database keeps the clean
+// path while the browser receives a new URL and cannot reuse an old PNG cache.
+const AVATAR_ASSET_VERSION = "2";
+
+function avatarImageUrl(path: string | null | undefined) {
+  return path ? `${path}?v=${AVATAR_ASSET_VERSION}` : undefined;
+}
+
 
 function AddressBook() {
   const utils = trpc.useUtils();
@@ -373,7 +381,7 @@ export default function Profile() {
       <Card>
         <CardContent className="flex flex-col items-center gap-4 p-6 text-center sm:flex-row sm:text-left">
           <Avatar className="h-24 w-24 border">
-            <AvatarImage src={profile.avatar ?? undefined} alt={profile.name ?? "Profile photo"} />
+            <AvatarImage src={avatarImageUrl(profile.avatar)} alt={profile.name ?? "Profile photo"} />
             <AvatarFallback className="text-2xl">{initials}</AvatarFallback>
           </Avatar>
           <div className="min-w-0 flex-1">
@@ -425,7 +433,7 @@ export default function Profile() {
                       disabled={updateProfile.isPending}
                     >
                       <Avatar className="h-14 w-14 border">
-                        <AvatarImage src={avatarPath} alt={formatAvatarName(avatarPath)} />
+                        <AvatarImage src={avatarImageUrl(avatarPath)} alt={formatAvatarName(avatarPath)} />
                         <AvatarFallback>{formatAvatarName(avatarPath).slice(0, 2).toUpperCase()}</AvatarFallback>
                       </Avatar>
                       <span className="flex items-center gap-1 text-xs font-medium">
