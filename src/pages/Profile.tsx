@@ -373,7 +373,7 @@ export default function Profile() {
       <Card>
         <CardContent className="flex flex-col items-center gap-4 p-6 text-center sm:flex-row sm:text-left">
           <Avatar className="h-24 w-24 border">
-            <AvatarImage src={profile.avatar ?? undefined} alt={profile.name ?? "Profile photo"} />
+            <AvatarImage key={profile.avatar ?? "fallback"} src={profile.avatar ?? undefined} alt={profile.name ?? "Profile photo"} />
             <AvatarFallback className="text-2xl">{initials}</AvatarFallback>
           </Avatar>
           <div className="min-w-0 flex-1">
