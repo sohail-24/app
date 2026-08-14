@@ -178,12 +178,16 @@ export async function findOrderById(orderId: number) {
 
   if (!order) return null;
 
-  const [buyer, supplier, platformAdmin, buyerUser] = await Promise.all([
+  const [buyer, supplier, supplierAdmin, platformAdmin, buyerUser] = await Promise.all([
     db.query.companies.findFirst({ where: eq(companies.id, order.buyerId) }),
     db.query.companies.findFirst({ where: eq(companies.id, order.supplierId) }),
+    db.query.users.findFirst({
+      where: and(eq(users.companyId, order.supplierId), eq(users.role, "admin")),
+    }),
     db.query.users.findFirst({ where: eq(users.role, "admin") }),
     db.query.users.findFirst({ where: eq(users.id, order.placedByUserId) }),
   ]);
+  const supplierAccount = supplierAdmin ?? platformAdmin;
 
   return {
     ...order,
@@ -195,14 +199,14 @@ export async function findOrderById(orderId: number) {
     buyerState: buyer?.state ?? null,
     buyerPostalCode: buyer?.postalCode ?? null,
     buyerCountry: buyer?.country ?? null,
-    supplierName: supplier?.name ?? null,
-    supplierPhone: platformAdmin?.phone ?? null,
-    supplierAddressLine1: supplier?.addressLine1 ?? null,
-    supplierAddressLine2: supplier?.addressLine2 ?? null,
-    supplierCity: supplier?.city ?? null,
-    supplierState: supplier?.state ?? null,
-    supplierPostalCode: supplier?.postalCode ?? null,
-    supplierCountry: supplier?.country ?? null,
+    supplierName: supplierAccount?.name ?? supplier?.name ?? null,
+    supplierPhone: supplierAccount?.phone ?? supplier?.phone ?? null,
+    supplierAddressLine1: supplierAccount?.addressLine1 ?? supplier?.addressLine1 ?? null,
+    supplierAddressLine2: supplierAccount?.addressLine2 ?? supplier?.addressLine2 ?? null,
+    supplierCity: supplierAccount?.city ?? supplier?.city ?? null,
+    supplierState: supplierAccount?.state ?? supplier?.state ?? null,
+    supplierPostalCode: supplierAccount?.postalCode ?? supplier?.postalCode ?? null,
+    supplierCountry: supplierAccount?.country ?? supplier?.country ?? null,
   };
 }
 
