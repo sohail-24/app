@@ -66,7 +66,7 @@ Authentication should provide:
               Input Validation (Zod)
                        │
                        ▼
-            Password Hashing (bcrypt)
+            Password Hashing (bcryptjs)
                        │
                        ▼
                 PostgreSQL Database
@@ -310,7 +310,7 @@ Return Unauthorized
 
 Implemented:
 
-- bcrypt password hashing
+- bcryptjs password hashing
 - JWT Access Tokens
 - JWT Refresh Tokens
 - Refresh Token Hashing
@@ -411,7 +411,7 @@ Password
 
 ↓
 
-bcrypt
+bcryptjs
 
 ↓
 
