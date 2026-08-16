@@ -27,7 +27,7 @@ Foundation → Business Platform → Platform Engineering → DevOps → Cloud �
 
 - [x] User Profile
 - [x] Profile Update
-- [ ] Company Profile
+- [x] Company Profile
 - [ ] Business Settings
 - [ ] Role Mapping
 - [ ] Authorization Review
@@ -70,23 +70,25 @@ Foundation → Business Platform → Platform Engineering → DevOps → Cloud �
 ## Customers
 
 - [x] Customer Management
-- [ ] Supplier Profiles
-- [ ] Buyer Profiles
+- [x] Supplier Profiles
+- [x] Buyer Profiles
 
 ## Reports
 
 - [x] Sales Reports
 - [x] Inventory Reports
 - [x] Order Analytics
-- [ ] Business Dashboard
+- [x] Business Dashboard
 
 ---
 
 # Phase 1
 - [x] Docker & Docker Compose
+- [x] Nginx configuration
+- [x] Let\'s Encrypt SSL
 
 # Phase 2
-Deploy to a single server / VPS
+- [x] Deploy to a single server / VPS
 
 # Phase 3
 CI/CD

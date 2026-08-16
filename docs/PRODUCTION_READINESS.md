@@ -5,13 +5,13 @@
 The FreshFlow application architecture is currently set up for containerized production deployment.
 
 ### **Current Status:**
-- **Frontend**: React + Vite (built to static files, served by Nginx).
-- **Backend**: Node.js + Hono + tRPC (bundled with ESBuild).
-- **Database**: PostgreSQL (managed via Drizzle ORM, with automated migrations on backend startup).
-- **Infrastructure**: Docker Compose managing Nginx, Node App, and Postgres.
+- **Frontend**: READY. React + Vite (built to static files, served by Nginx).
+- **Backend**: READY. Node.js + Hono + tRPC (bundled with ESBuild).
+- **Database**: READY. PostgreSQL (managed via Drizzle ORM, with automated migrations on backend startup).
+- **Infrastructure**: READY. Docker Compose managing Nginx, Node App, and Postgres.
 
 ### **Security Improvements:**
-- **HTTPS:** Configured via Nginx and Let's Encrypt (Pending Phase 3 DNS setup).
+- **HTTPS:** READY. Configured via Nginx and Let\'s Encrypt for amfruits.shop.
 - **Security Headers:** Added the `X-XSS-Protection` header to `nginx/nginx.conf` to further harden the Nginx configuration, supplementing existing security headers. Also configured CSP.
 - **Server-side Payment Signature Verification:** Securely verifies Razorpay payment callbacks using a local server secret.
 - **Timing-safe Comparison:** Uses `crypto.timingSafeEqual` during payment verification to prevent timing attacks.
@@ -30,7 +30,7 @@ The FreshFlow application architecture is currently set up for containerized pro
 - **Logging Limits:** Added `max-size: "10m"` and `max-file: "3"` to `nginx`, `app`, and `db` services in `docker-compose.yml` to prevent unbounded log growth.
 
 ### **Payment Readiness:**
-- **Razorpay Integration:** Completed end-to-end checkout flow.
+- **Razorpay Integration:** READY. Completed end-to-end checkout flow.
 - **Payment Signature Verification:** Enforced during order creation.
 - **Duplicate Order Prevention:** Database check before creating an order.
 - **Failed/Cancelled Payment Handling:** Frontend handles Razorpay closure gracefully without leaving dirty state.

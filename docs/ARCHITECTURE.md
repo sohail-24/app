@@ -224,14 +224,14 @@ FreshFlow is containerized following a Platform Engineering Phase 1 approach. Pr
 
 ### Container Flow
 
-- **Nginx Container:** Runs `nginx:stable` on port `80`. It acts as the single public entry point for the application. It statically serves the React SPA frontend and reverse-proxies all `/api/*` and WebSocket upgrades to the internal Node backend. It provides compression (gzip), security headers, and rate-limiting. Health checks utilize `GET /nginx-health`.
+- **Nginx Container:** Runs `nginx:stable` on port `80` and `443`. It acts as the single public entry point for the application serving the domain `amfruits.shop` and `www.amfruits.shop`. It statically serves the React SPA frontend and reverse-proxies all `/api/*` and WebSocket upgrades to the internal Node backend. It provides compression (gzip), security headers, handles Let's Encrypt ACME challenges, and rate-limiting. Health checks utilize `GET /nginx-health`.
 - **App Container:** Runs the Node backend (`node:22-slim`) on internal port `3000`. It executes the bundled Hono server (`dist/boot.js`). Health checks utilize `GET /health` internally.
 - **Database Container:** Runs `postgres:15-alpine` on internal port `5432`. Data is persisted using the `pgdata` volume.
 
 ### Volumes and Networks
 
 - **Networks:** Services communicate securely over the `freshflow-network` bridge.
-- **Volumes:** `pgdata` stores PostgreSQL database state. `product_uploads` stores uploaded product images at `/app/uploads`.
+- **Volumes:** `pgdata` stores PostgreSQL database state. `product_uploads` stores uploaded product images at `/app/uploads`. `/etc/letsencrypt` is mounted to nginx for SSL certificates.
 
 ### Startup Sequence
 
@@ -239,7 +239,6 @@ FreshFlow is containerized following a Platform Engineering Phase 1 approach. Pr
 2. The Node App waits for the Postgres container health check (`pg_isready`).
 3. The Node App starts, running Drizzle migrations programmatically in `api/boot.ts` before listening for requests.
 4. Nginx waits for the App container health check before serving traffic.
-
 
 ### Network Request Flow
 
@@ -333,9 +332,9 @@ Planned evolution:
 - Add role and permission tables for manager, warehouse staff, sales executive, and platform admin.
 - Introduce tenant-aware middleware that scopes every query by active company/tenant.
 - Implement invoice, delivery, customer, warehouse, and notification modules.
-- Add payment gateway integration.
+
 - Add import/export and bulk edit jobs.
 - Add reporting aggregates and scheduled analytics snapshots.
-- Add Docker, CI/CD, cloud deployment, and Kubernetes deployment targets.
+- Add CI/CD, cloud deployment, and Kubernetes deployment targets.
 - Add audit logs for owner/admin actions.
 - Add automated tests for role gating, product CRUD, order lifecycle, and image fallback behavior.

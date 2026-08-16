@@ -1,6 +1,6 @@
 # FreshFlow API Standards
 
-**Version:** 1.0
+**Version:** 1.1
 
 **Status:** Active
 
@@ -20,27 +20,13 @@ This document serves as the project-wide API standard that every backend service
 
 ---
 
-# API Philosophy
-
-FreshFlow follows these API principles:
-
-* Consistent API design.
-* Clear separation of business modules.
-* Predictable request and response patterns.
-* Secure by default.
-* Validation before business logic.
-* Authorization before data access.
-* Technology-independent documentation where possible.
-
----
-
 # API Architecture
 
 FreshFlow exposes backend functionality through **tRPC**.
 
 Business logic is organised into independent routers.
 
-Typical router structure:
+Current implemented routers:
 
 ```text
 address
@@ -378,15 +364,10 @@ docs/UI/<module>/API.md
 
 # Version History
 
+## Version 1.1
+
+Updated to accurately reflect the real API implemented, including all current routers and Razorpay flow.
+
 ## Version 1.0
 
 Initial API standards document.
-
-Focus areas:
-
-* Project-wide API standards.
-* Consistent API design.
-* Module ownership.
-* Validation standards.
-* Security principles.
-* Documentation guidelines.
