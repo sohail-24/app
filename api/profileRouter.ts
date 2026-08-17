@@ -19,8 +19,8 @@ const avatarPathSchema = z
   .string()
   .regex(/^\/avatars\/[A-Za-z0-9][A-Za-z0-9._-]*\.(png|jpe?g|webp|gif|svg)$/i, "Choose a valid avatar.");
 const publicAvatarsDirectories = [
-  resolve(import.meta.dirname, "../public/avatars"),
-  resolve(import.meta.dirname, "../dist/public/avatars"),
+  resolve(process.cwd(), "public/avatars"),
+  resolve(process.cwd(), "dist/public/avatars"),
 ];
 const avatarExtensions = new Set([".png", ".jpg", ".jpeg", ".webp", ".gif", ".svg"]);
 
