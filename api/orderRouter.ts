@@ -28,6 +28,7 @@ import { calculateGstForOrder } from "./queries/gst";
 import { calculateShippingForOrder } from "./queries/shipping";
 import { BUSINESS_OWNER_EMAIL } from "@contracts/roles";
 import { findUserByEmail } from "./queries/users";
+import { notifyAdminNewOrder } from "./services/orderNotification";
 
 function canAccessOrderDetails(input: {
   user: { role: string; email?: string | null; companyId?: number | null };
@@ -527,6 +528,19 @@ export const orderRouter = createRouter({
         },
         items: orderItemsData,
       });
+
+      // Trigger Admin New Order Email Notification safely
+      // Email delivery failure must NOT break the successfully persisted order
+      try {
+        const origin =
+          ctx.req.headers.get("origin") ||
+          (ctx.req.headers.get("host")
+            ? `http://${ctx.req.headers.get("host")}`
+            : undefined);
+        await notifyAdminNewOrder(order.id, { appUrl: origin });
+      } catch (notifyErr) {
+        console.error("Failed to notify admin of new order:", notifyErr);
+      }
 
       return { orderId: order.id, orderNumber: order.orderNumber, totalAmount: totalAmount.toFixed(2) };
     }),

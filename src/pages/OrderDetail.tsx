@@ -24,7 +24,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Separator } from "@/components/ui/separator";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { AlertCircle, FileText, MapPin, Package, Truck, User } from "lucide-react";
+import { AlertCircle, Building2, FileText, MapPin, Package, Truck, User } from "lucide-react";
 
 type OrderStatus =
   | "pending"
@@ -63,6 +63,7 @@ type OrderDetailData = {
   buyerCountry: string | null;
   supplierName: string | null;
   supplierPhone: string | null;
+  supplierEmail?: string | null;
   supplierAddressLine1: string | null;
   supplierAddressLine2: string | null;
   supplierCity: string | null;
@@ -201,8 +202,8 @@ export default function OrderDetail() {
           <Card>
             <CardHeader>
               <CardTitle className="flex items-center gap-2 text-base">
-                <User className="h-4 w-4" />
-                {ownerMode ? "Buyer Information" : "Supplier Information"}
+                {ownerMode ? <User className="h-4 w-4" /> : <Building2 className="h-4 w-4" />}
+                {ownerMode ? "Buyer Information" : "Business Information"}
               </CardTitle>
             </CardHeader>
             <CardContent className="grid gap-3 text-sm sm:grid-cols-2">
@@ -211,15 +212,23 @@ export default function OrderDetail() {
                   <ReadOnly label="Buyer" value={order.buyerName} />
                   <ReadOnly label="Phone" value={order.buyerPhone} />
                   <ReadOnly label="Buyer Address" value={formatCompanyAddress(order, "buyer")} />
+                  <ReadOnly label="Delivery Address" value={formatAddress(order)} />
                 </>
               ) : (
                 <>
-                  <ReadOnly label="Supplier" value={order.supplierName} />
-                  <ReadOnly label="Phone" value={order.supplierPhone} />
-                  <ReadOnly label="Supplier Address" value={formatCompanyAddress(order, "supplier")} />
+                  <ReadOnly label="Business Name" value={order.supplierName} />
+                  <ReadOnly label="Phone / Contact" value={order.supplierPhone} />
+                  {order.supplierEmail && <ReadOnly label="Email" value={order.supplierEmail} />}
+                  <ReadOnly
+                    label="Address"
+                    value={[order.supplierAddressLine1, order.supplierAddressLine2].filter(Boolean).join(", ") || null}
+                  />
+                  {order.supplierCity && <ReadOnly label="City" value={order.supplierCity} />}
+                  {order.supplierState && <ReadOnly label="State" value={order.supplierState} />}
+                  {order.supplierPostalCode && <ReadOnly label="PIN / Postal Code" value={order.supplierPostalCode} />}
+                  {order.supplierCountry && <ReadOnly label="Country" value={order.supplierCountry} />}
                 </>
               )}
-              <ReadOnly label="Delivery Address" value={formatAddress(order)} />
             </CardContent>
           </Card>
 

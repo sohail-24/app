@@ -5,7 +5,6 @@ import {
   Apple,
   Beef,
   Boxes,
-  ChevronDown,
   CircleUserRound,
   ClipboardList,
   LayoutGrid,
@@ -30,7 +29,6 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
 import { QuantitySelector } from "@/components/freshflow/QuantitySelector";
 
@@ -79,6 +77,7 @@ function getCategoryEmoji(name: string): string | React.ElementType {
   if (lowerName.includes("apples") || lowerName.includes("pears")) return "🍎";
   if (lowerName.includes("grapes")) return "🍇";
   if (lowerName.includes("exotic")) return "🥝";
+  if (lowerName.includes("melons")) return "🍉";
   return "🌿"; // fallback
 }
 
@@ -87,7 +86,7 @@ export default function LandingPage() {
   const { user, isAuthenticated } = useAuth();
   const [search, setSearch] = useState("");
   const [categoryId, setCategoryId] = useState("all");
-  const [sort, setSort] = useState<"newest" | "price" | "name">("newest");
+  const [sort] = useState<"newest" | "price" | "name">("newest");
   const [visibleRecent, setVisibleRecent] = useState(8);
   const utils = trpc.useUtils();
 
@@ -121,7 +120,11 @@ export default function LandingPage() {
     onError: (error) => toast.error(error.message || "Could not add product to cart."),
   });
 
-  const categories = (categoriesQuery.data ?? []) as MarketplaceCategory[];
+  const categoriesRaw = categoriesQuery.data;
+  const categories = useMemo(
+    () => (categoriesRaw ?? []) as MarketplaceCategory[],
+    [categoriesRaw],
+  );
   const products = (productsQuery.data ?? []) as MarketplaceProduct[];
   const freshDeals = (freshDealsQuery.data ?? []) as MarketplaceProduct[];
   const recentProducts = products.slice(8, 8 + visibleRecent);
@@ -212,39 +215,13 @@ export default function LandingPage() {
             </nav>
           </div>
 
-          <div className="-mx-3 overflow-x-auto border-t border-slate-100 px-3 pt-2 sm:-mx-4 sm:px-4 lg:-mx-6 lg:px-6 hidden sm:block">
-            <div className="flex min-w-max gap-2">
+          <div className="-mx-3 overflow-x-auto border-t border-slate-100 px-3 py-2 sm:-mx-4 sm:px-4 sm:py-2.5 lg:-mx-6 lg:px-6 hide-scrollbar touch-pan-x">
+            <div className="flex min-w-max items-center gap-3 sm:gap-4 px-1">
               {categoriesQuery.isLoading ? (
-                Array.from({ length: 8 }).map((_, index) => <Skeleton key={index} className="h-9 w-24 shrink-0" />)
-              ) : (
-                categoryNavItems.map((category) => (
-                  <Button
-                    key={category.id}
-                    type="button"
-                    variant={categoryId === category.id ? "default" : "ghost"}
-                    size="sm"
-                    className={categoryId === category.id ? "shrink-0 bg-primary hover:bg-primary/90" : "shrink-0"}
-                    onClick={() => setCategoryId(category.id)}
-                  >
-                    {category.name}
-                  </Button>
-                ))
-              )}
-              <Link to="/products">
-                <Button variant="ghost" size="sm" className="shrink-0 gap-1">
-                  More <ChevronDown className="h-3.5 w-3.5" />
-                </Button>
-              </Link>
-            </div>
-          </div>
-
-          <div className="-mx-3 overflow-x-auto border-t border-slate-100 px-3 py-3 sm:hidden hide-scrollbar">
-            <div className="flex min-w-max gap-4 px-2">
-              {categoriesQuery.isLoading ? (
-                Array.from({ length: 6 }).map((_, index) => (
+                Array.from({ length: 8 }).map((_, index) => (
                   <div key={index} className="flex flex-col items-center gap-1">
-                    <Skeleton className="h-14 w-14 rounded-full" />
-                    <Skeleton className="h-3 w-16" />
+                    <Skeleton className="h-10 w-10 sm:h-11 sm:w-11 rounded-full" />
+                    <Skeleton className="h-2.5 w-12" />
                   </div>
                 ))
               ) : (
@@ -257,16 +234,26 @@ export default function LandingPage() {
                       key={category.id}
                       type="button"
                       onClick={() => setCategoryId(category.id)}
-                      className="flex flex-col items-center gap-1.5 shrink-0 group focus:outline-none"
+                      className="group flex flex-col items-center gap-1 shrink-0 focus:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-1 rounded-md px-1 py-0.5"
                     >
-                      <div className={`flex h-14 w-14 items-center justify-center rounded-full border shadow-sm transition-all ${isActive ? 'bg-primary border-primary text-primary-foreground' : 'bg-card border-border text-foreground group-active:scale-95'}`}>
-                        {typeof EmojiOrIcon === 'string' ? (
-                          <span className="text-2xl">{EmojiOrIcon}</span>
+                      <div
+                        className={`flex h-10 w-10 sm:h-11 sm:w-11 items-center justify-center rounded-full border transition-all ${
+                          isActive
+                            ? "bg-primary border-primary text-primary-foreground shadow-sm ring-2 ring-primary/20"
+                            : "bg-card border-border text-foreground hover:border-primary/50 hover:bg-muted/40 group-active:scale-95"
+                        }`}
+                      >
+                        {typeof EmojiOrIcon === "string" ? (
+                          <span className="text-lg sm:text-xl leading-none select-none">{EmojiOrIcon}</span>
                         ) : (
-                          <EmojiOrIcon className="h-6 w-6" />
+                          <EmojiOrIcon className="h-4.5 w-4.5 sm:h-5 sm:w-5" />
                         )}
                       </div>
-                      <span className={`text-[10px] sm:text-xs font-medium max-w-[64px] truncate text-center ${isActive ? 'text-primary font-bold' : 'text-foreground/80'}`}>
+                      <span
+                        className={`text-[11px] sm:text-xs font-medium max-w-[68px] sm:max-w-[76px] truncate text-center leading-tight ${
+                          isActive ? "text-primary font-semibold" : "text-muted-foreground group-hover:text-foreground"
+                        }`}
+                      >
                         {category.name}
                       </span>
                     </button>
@@ -312,47 +299,21 @@ export default function LandingPage() {
           </div>
         </section>
 
-        <section className="mt-5 space-y-3">
-          <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+        <section className="mt-4 sm:mt-5 space-y-3">
+          <div className="flex items-center justify-between gap-3">
             <div>
-              <p className="text-sm font-medium text-primary">Wholesale Marketplace</p>
-              <h1 className="text-2xl font-semibold tracking-tight sm:text-3xl">Today's Fresh Deals</h1>
-              <p className="mt-1 text-sm text-muted-foreground hidden sm:block">
+              <p className="text-xs font-semibold uppercase tracking-wider text-primary">Wholesale Marketplace</p>
+              <h1 className="text-xl font-bold tracking-tight sm:text-2xl">Today's Fresh Deals</h1>
+              <p className="mt-0.5 text-xs text-muted-foreground hidden sm:block">
                 Browse active wholesale products before logging in. MOQ, stock, supplier, and price stay visible.
               </p>
             </div>
-            <div className="flex flex-wrap gap-2">
-              <Select value={categoryId} onValueChange={setCategoryId}>
-                <SelectTrigger className="w-44 bg-card">
-                  <SelectValue placeholder="Category" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">All Categories</SelectItem>
-                  {categories.map((category) => (
-                    <SelectItem key={category.id} value={String(category.id)}>
-                      {category.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-              <Select value={sort} onValueChange={(value) => setSort(value as "newest" | "price" | "name")}>
-                <SelectTrigger className="w-36 bg-card">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="newest">Newest</SelectItem>
-                  <SelectItem value="price">Price</SelectItem>
-                  <SelectItem value="name">Name</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
+            {selectedCategory && (
+              <Badge variant="outline" className="w-fit shrink-0 rounded-md border-border bg-card text-primary text-xs">
+                Browsing {selectedCategory.name}
+              </Badge>
+            )}
           </div>
-
-          {selectedCategory && (
-            <Badge variant="outline" className="w-fit rounded-md border-border bg-card text-primary">
-              Browsing {selectedCategory.name}
-            </Badge>
-          )}
 
           <ProductGrid
             products={freshDeals}

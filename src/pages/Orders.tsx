@@ -141,7 +141,7 @@ export default function Orders() {
             <OwnerOrdersTable orders={orders} />
           ) : (
             <div className="grid gap-3">
-              {orders.map((order) => <BuyerOrderCard key={order.id} order={order} />)}
+              {orders.map((order, index) => <BuyerOrderCard key={`buyer-order-${order.id || index}-${order.orderNumber || index}`} order={order} />)}
             </div>
           )}
           <div className="flex items-center justify-between gap-3">
@@ -184,8 +184,8 @@ function OwnerOrdersTable({ orders }: { orders: OrderSummary[] }) {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {orders.map((order) => (
-                <TableRow key={order.id}>
+              {orders.map((order, index) => (
+                <TableRow key={`owner-order-row-${order.id || index}-${order.orderNumber || index}`}>
                   <TableCell className="font-medium">{order.orderNumber}</TableCell>
                   <TableCell>{order.relatedCompanyName ?? "Customer"}</TableCell>
                   <TableCell>{order.itemCount}</TableCell>
@@ -204,7 +204,7 @@ function OwnerOrdersTable({ orders }: { orders: OrderSummary[] }) {
           </Table>
         </div>
         <div className="grid gap-3 p-3 md:hidden">
-          {orders.map((order) => <BuyerOrderCard key={order.id} order={order} customerLabel="Customer" />)}
+          {orders.map((order, index) => <BuyerOrderCard key={`owner-order-card-${order.id || index}-${order.orderNumber || index}`} order={order} customerLabel="Customer" />)}
         </div>
       </CardContent>
     </Card>

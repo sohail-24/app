@@ -87,7 +87,6 @@ const roleNavigation: Record<AppRole, NavGroup[]> = {
         { icon: ShoppingBag, label: "Browse Products", path: "/products" },
         { icon: ShoppingCart, label: "My Cart", path: "/cart", badge: "cart" },
         { icon: ClipboardList, label: "Purchase Orders", path: "/orders" },
-        { icon: Truck, label: "Track Deliveries", path: "/orders" },
       ],
     },
     {
@@ -237,7 +236,7 @@ function AppLayoutContent() {
                   {group.items.map((item) => {
                     const active = isActive(item.path);
                     return (
-                      <SidebarMenuItem key={item.path}>
+                      <SidebarMenuItem key={`${group.label}-${item.label}-${item.path}`}>
                         <SidebarMenuButton
                           isActive={active}
                           tooltip={item.label}

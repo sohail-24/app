@@ -1,0 +1,6 @@
+{
+  "name": "FreshFlow",
+  "description": "B2B fresh produce ordering, ERP, inventory, and warehouse management platform",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

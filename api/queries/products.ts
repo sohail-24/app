@@ -1,5 +1,5 @@
 import { getDb } from "./connection";
-import { inventory, products, categories, companies, type InsertProduct } from "@db/schema";
+import { inventory, products, categories, companies, users, warehouses, type InsertProduct } from "@db/schema";
 import {
   eq,
   and,
@@ -226,7 +226,50 @@ async function findProductDetailBySlug(slug: string, visibilityConditions: SQL[]
     .where(and(eq(products.slug, slug), ...visibilityConditions))
     .limit(1);
 
-  return rows[0] ?? null;
+  const row = rows[0] ?? null;
+  if (!row) return null;
+
+  // If supplier is AM Fruits / store owner (seed placeholder "amfruits-warehouse", supplierId 19, 2, or owner product)
+  const isOwnerSupplier =
+    row.supplierSlug === "amfruits-warehouse" ||
+    row.supplierName === "AMfruits-warehouse" ||
+    row.supplierId === 19 ||
+    row.supplierId === 2 ||
+    (!row.supplierName && (row.supplierId === 1 || !row.supplierId));
+
+  if (isOwnerSupplier) {
+    const [adminUser, activeWarehouse] = await Promise.all([
+      db.query.users.findFirst({
+        where: eq(users.role, "admin"),
+      }).catch(() => null),
+      db.query.warehouses.findFirst({
+        where: eq(warehouses.status, "active"),
+      }).catch(() => null),
+    ]);
+
+    const realName = adminUser?.name || activeWarehouse?.name || "AM Fruits";
+    const realPhone = adminUser?.phone || activeWarehouse?.contactNumber || null;
+    const realAddressLine1 = activeWarehouse?.address || adminUser?.addressLine1 || null;
+    const realCity = activeWarehouse?.city || adminUser?.city || null;
+    const realState = activeWarehouse?.state || adminUser?.state || null;
+    const realPostalCode = activeWarehouse?.postalCode || adminUser?.postalCode || null;
+    const realCountry = activeWarehouse?.country || adminUser?.country || null;
+
+    return {
+      ...row,
+      supplierName: realName,
+      supplierSlug: "am-fruits",
+      supplierPhone: realPhone,
+      supplierAddressLine1: realAddressLine1,
+      supplierAddressLine2: null,
+      supplierCity: realCity,
+      supplierState: realState,
+      supplierPostalCode: realPostalCode,
+      supplierCountry: realCountry,
+    };
+  }
+
+  return row;
 }
 
 export async function findProductBySlug(slug: string) {

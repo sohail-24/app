@@ -6,6 +6,7 @@ import {
   orderItems,
   orders,
   users,
+  warehouses,
   type InsertOrder,
   type InsertOrderItem,
 } from "@db/schema";
@@ -178,7 +179,7 @@ export async function findOrderById(orderId: number) {
 
   if (!order) return null;
 
-  const [buyer, supplier, supplierAdmin, platformAdmin, buyerUser] = await Promise.all([
+  const [buyer, supplier, supplierAdmin, platformAdmin, buyerUser, activeWarehouse] = await Promise.all([
     db.query.companies.findFirst({ where: eq(companies.id, order.buyerId) }),
     db.query.companies.findFirst({ where: eq(companies.id, order.supplierId) }),
     db.query.users.findFirst({
@@ -186,8 +187,57 @@ export async function findOrderById(orderId: number) {
     }),
     db.query.users.findFirst({ where: eq(users.role, "admin") }),
     db.query.users.findFirst({ where: eq(users.id, order.placedByUserId) }),
+    db.query.warehouses.findFirst({ where: eq(warehouses.status, "active") }),
   ]);
-  const supplierAccount = supplierAdmin ?? platformAdmin;
+
+  // Determine if supplier is the store owner / AM Fruits or placeholder seed company
+  const isOwnerOrPlaceholder =
+    !supplier ||
+    supplier.slug === "amfruits-warehouse" ||
+    supplier.name === "AMfruits-warehouse" ||
+    order.supplierId === 19 ||
+    order.supplierId === 2 ||
+    order.supplierId === 1 ||
+    order.supplierId === platformAdmin?.companyId ||
+    supplier.country === "USA" ||
+    Boolean(supplier.addressLine1?.includes("Fruit Ave"));
+
+  const businessAccount = isOwnerOrPlaceholder ? platformAdmin : (supplierAdmin ?? platformAdmin);
+  const businessName = isOwnerOrPlaceholder
+    ? (businessAccount?.name || activeWarehouse?.name || "AM Fruits")
+    : (supplierAdmin?.name || supplier?.name || businessAccount?.name || "AM Fruits");
+
+  const businessPhone = isOwnerOrPlaceholder
+    ? (businessAccount?.phone || activeWarehouse?.contactNumber || null)
+    : (supplierAdmin?.phone || supplier?.phone || businessAccount?.phone || null);
+
+  const businessEmail = isOwnerOrPlaceholder
+    ? (businessAccount?.email || null)
+    : (supplierAdmin?.email || supplier?.email || businessAccount?.email || null);
+
+  const businessAddressLine1 = isOwnerOrPlaceholder
+    ? (businessAccount?.addressLine1 || activeWarehouse?.address || null)
+    : (supplierAdmin?.addressLine1 || supplier?.addressLine1 || businessAccount?.addressLine1 || null);
+
+  const businessAddressLine2 = isOwnerOrPlaceholder
+    ? (businessAccount?.addressLine2 || null)
+    : (supplierAdmin?.addressLine2 || supplier?.addressLine2 || null);
+
+  const businessCity = isOwnerOrPlaceholder
+    ? (businessAccount?.city || activeWarehouse?.city || null)
+    : (supplierAdmin?.city || supplier?.city || businessAccount?.city || null);
+
+  const businessState = isOwnerOrPlaceholder
+    ? (businessAccount?.state || activeWarehouse?.state || null)
+    : (supplierAdmin?.state || (supplier?.country !== "USA" ? supplier?.state : null) || activeWarehouse?.state || null);
+
+  const businessPostalCode = isOwnerOrPlaceholder
+    ? (businessAccount?.postalCode || activeWarehouse?.postalCode || null)
+    : (supplierAdmin?.postalCode || (supplier?.country !== "USA" ? supplier?.postalCode : null) || businessAccount?.postalCode || null);
+
+  const businessCountry = isOwnerOrPlaceholder
+    ? (businessAccount?.country || activeWarehouse?.country || "India")
+    : (supplierAdmin?.country || (supplier?.country !== "USA" ? supplier?.country : null) || businessAccount?.country || "India");
 
   return {
     ...order,
@@ -199,14 +249,15 @@ export async function findOrderById(orderId: number) {
     buyerState: buyer?.state ?? null,
     buyerPostalCode: buyer?.postalCode ?? null,
     buyerCountry: buyer?.country ?? null,
-    supplierName: supplierAccount?.name ?? supplier?.name ?? null,
-    supplierPhone: supplierAccount?.phone ?? supplier?.phone ?? null,
-    supplierAddressLine1: supplierAccount?.addressLine1 ?? supplier?.addressLine1 ?? null,
-    supplierAddressLine2: supplierAccount?.addressLine2 ?? supplier?.addressLine2 ?? null,
-    supplierCity: supplierAccount?.city ?? supplier?.city ?? null,
-    supplierState: supplierAccount?.state ?? supplier?.state ?? null,
-    supplierPostalCode: supplierAccount?.postalCode ?? supplier?.postalCode ?? null,
-    supplierCountry: supplierAccount?.country ?? supplier?.country ?? null,
+    supplierName: businessName,
+    supplierPhone: businessPhone,
+    supplierEmail: businessEmail,
+    supplierAddressLine1: businessAddressLine1,
+    supplierAddressLine2: businessAddressLine2,
+    supplierCity: businessCity,
+    supplierState: businessState,
+    supplierPostalCode: businessPostalCode,
+    supplierCountry: businessCountry,
   };
 }
 

@@ -95,13 +95,13 @@ export default function ProductDetail() {
   }
 
   return (
-    <div className="mx-auto max-w-6xl space-y-5 px-4 md:px-0">
-      <section className="sticky top-0 z-40 bg-background/95 backdrop-blur px-4 py-3 -mx-4 mb-5 border-b md:static md:bg-transparent md:p-0 md:mx-0 md:mb-0 md:border-b md:pb-3 flex flex-wrap items-center justify-between gap-3">
+    <div className="mx-auto max-w-6xl flex flex-col gap-5 px-4 md:px-0">
+      <section className="flex items-center justify-between md:border-b md:pb-3">
         <Link to="/products" className="inline-flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground">
           <ArrowLeft className="h-4 w-4" />
           Back to Products
         </Link>
-        <div className="flex gap-2">
+        <div className="hidden md:flex gap-2">
           <Button variant="outline" size="sm"><Heart className="mr-2 h-4 w-4" />Wishlist</Button>
           <Button variant="outline" size="sm"><Share2 className="mr-2 h-4 w-4" />Share</Button>
         </div>
@@ -134,10 +134,24 @@ export default function ProductDetail() {
             {discount > 0 && <Badge>{discount}% OFF</Badge>}
           </div>
           <div className="grid gap-2 text-sm text-muted-foreground sm:grid-cols-2">
-            <p>Stock : {product.stock ?? "Not set"} {unit}</p>
-            <p>MOQ : {minQty} {unit}</p>
-            <p>Origin: {product.origin ?? "Not set"}</p>
-            <p>Grade: {product.grade ?? "Not set"}</p>
+            <p><span className="font-medium text-foreground">Stock:</span> {product.stock ?? "Not set"} {unitLabels[unit] ?? unit}</p>
+            <p><span className="font-medium text-foreground">Unit:</span> {unitLabels[unit] ?? unit}</p>
+            <p>
+              <span className="font-medium text-foreground">Unit Size:</span>{" "}
+              {product.unitSize ? (
+                <>
+                  {product.unitSize}{" "}
+                  <span className="text-xs text-muted-foreground">
+                    (1 {unitLabels[unit] ?? unit} = {product.unitSize})
+                  </span>
+                </>
+              ) : (
+                "Not set"
+              )}
+            </p>
+            <p className="hidden md:block"><span className="font-medium text-foreground">MOQ:</span> {minQty} {unitLabels[unit] ?? unit}</p>
+            <p><span className="font-medium text-foreground">Origin:</span> {product.origin ?? "Not set"}</p>
+            <p><span className="font-medium text-foreground">Grade:</span> {product.grade ?? "Not set"}</p>
           </div>
 
           <div className="flex flex-col gap-3 mt-6 md:mt-0">
@@ -148,7 +162,7 @@ export default function ProductDetail() {
                   <Button variant="outline" size="icon" className="h-10 w-10 shadow-sm" onClick={() => setQuantity(Math.max(minQty, quantity - 1))} disabled={quantity <= minQty || isOutOfStock}>
                     <Minus className="h-4 w-4" />
                   </Button>
-                  <span className="min-w-16 text-center font-semibold">{quantity} {unit}</span>
+                  <span className="min-w-16 text-center font-semibold">{quantity} {unitLabels[unit] ?? unit}</span>
                   <Button variant="outline" size="icon" className="h-10 w-10 shadow-sm" onClick={() => {
                     if (quantity >= stock) {
                       toast.error(`Only ${stock} available.`);
@@ -170,10 +184,6 @@ export default function ProductDetail() {
               <Button variant="outline" className="h-12 bg-card" onClick={() => addProduct("/products")} disabled={isOutOfStock}>
                 <ShoppingCart className="mr-2 h-4 w-4" />
                 {isOutOfStock ? "Out of Stock" : "Add & Continue Shopping"}
-              </Button>
-              <Button variant="outline" className="h-12 bg-card" onClick={() => addProduct("/cart")} disabled={isOutOfStock}>
-                <ShoppingCart className="mr-2 h-4 w-4" />
-                {isOutOfStock ? "Out of Stock" : "Add to Cart & Go to Cart"}
               </Button>
               <Button className="h-12 bg-primary hover:bg-primary/90" onClick={() => addProduct("/checkout")} disabled={isOutOfStock}>
                 <Zap className="mr-2 h-4 w-4" />
@@ -197,27 +207,30 @@ export default function ProductDetail() {
       <DetailSection title="Product Description">
         {product.description ?? "No description has been added for this product."}
       </DetailSection>
-      <DetailSection title="Product Specifications">
-        No specifications have been added for this product.
-      </DetailSection>
+      <div className="hidden md:block">
+        <DetailSection title="Product Specifications">
+          No specifications have been added for this product.
+        </DetailSection>
+      </div>
       <DetailSection title="Supplier Information">
         <div className="grid gap-2 text-sm sm:grid-cols-2">
-          <p>Supplier Name: {product.supplierName ?? "Not set"}</p>
-          <p>Address: {formatSupplierAddress(product)}</p>
-          <p>Contact: {product.supplierPhone ?? "Not set"}</p>
-          <p>Status: {product.inventoryStatus ?? product.status ?? "Not set"}</p>
+          <p><span className="font-medium text-foreground">Supplier Name:</span> {product.supplierName ?? "Not set"}</p>
+          <p><span className="font-medium text-foreground">Phone / Contact:</span> {product.supplierPhone ?? "Not set"}</p>
+          <p className="sm:col-span-2"><span className="font-medium text-foreground">Address:</span> {formatSupplierAddress(product)}</p>
         </div>
       </DetailSection>
       {related.length > 0 && (
-        <DetailSection title="Related Products">
-          <div className="flex flex-wrap gap-2">
-            {related.map((item) => (
-              <Link key={item.slug} to={`/products/${item.slug}`} className="rounded-md border px-3 py-2 text-sm hover:bg-muted">
-                {item.name}
-              </Link>
-            ))}
-          </div>
-        </DetailSection>
+        <div className="hidden md:block">
+          <DetailSection title="Related Products">
+            <div className="flex flex-wrap gap-2">
+              {related.map((item) => (
+                <Link key={item.slug} to={`/products/${item.slug}`} className="rounded-md border px-3 py-2 text-sm hover:bg-muted">
+                  {item.name}
+                </Link>
+              ))}
+            </div>
+          </DetailSection>
+        </div>
       )}
     </div>
   );
