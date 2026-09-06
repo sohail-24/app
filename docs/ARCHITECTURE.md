@@ -1,6 +1,6 @@
 # AM Fruits (FreshFlow) Architecture
 
-*Note: FreshFlow is the internal project/platform name; AM Fruits is the current public business/product brand.*
+_Note: FreshFlow is the internal project/platform name; AM Fruits is the current public business/product brand._
 
 ## Project Overview
 
@@ -61,8 +61,6 @@ Product image rendering uses fallback placeholders on list, dashboard, detail, a
 
 ## Backend Architecture
 
-
-
 The backend is a Hono server with tRPC routers. It uses Drizzle ORM against PostgreSQL (Neon). The server entry is bundled from `api/boot.ts`; `api/router.ts` aggregates domain routers.
 
 Backend query functions live in `api/queries/` and keep database access separate from router input validation and authorization. Routers validate input with Zod and call query helpers for persistence.
@@ -72,6 +70,7 @@ Backend query functions live in `api/queries/` and keep database access separate
 Current Drizzle tables:
 
 - `users`: authenticated users, local/mobile auth fields, role, company association, profile fields.
+- `user_addresses`: addresses associated with users/profiles.
 - `otp_verifications`: mobile OTP challenge records.
 - `companies`: buyer, supplier, or both company records.
 - `customers`: customer management records.
@@ -100,6 +99,14 @@ Important relationships:
 - `order_items.orderId` references `orders.id`.
 - `inventory.productId` and `inventory.supplierId` link stock to products and suppliers.
 
+## Admin/Business Profile Address Source
+
+The authoritative source of truth for business addresses used throughout the application (such as the supplier address shown on buyer Order Details) is the `user_addresses` table linked to the platform admin profile.
+
+- Order queries dynamically resolve the supplier address by retrieving the default address from `user_addresses` for the platform admin user.
+- It does not rely on hardcoded physical addresses in the codebase or generic company records when a specific admin profile address exists.
+- The data flow prioritizes the live `user_addresses` (Admin Profile) over legacy company fields.
+
 ## API Routers
 
 `appRouter` includes:
@@ -115,6 +122,7 @@ Important relationships:
 - `invoice`: invoice operations.
 - `report`: reporting aggregates.
 - `profile`: user profile management.
+- `address`: user address management.
 - `customer`: customer records.
 - `deliveryZone`: delivery zone configurations.
 - `gst`: GST settings.
@@ -204,19 +212,19 @@ Buyers must never see administrative controls. The UI hides add/edit/delete prod
 
 ## Technology Stack
 
-| Layer | Technology |
-| --- | --- |
-| Frontend | React 19, TypeScript, Vite |
-| Routing | React Router |
-| Styling | Tailwind CSS, shadcn/ui-style components, lucide-react icons |
-| Data Fetching | tRPC React + TanStack Query |
-| Backend | Hono, tRPC 11 |
-| Database | PostgreSQL (Neon) with Drizzle ORM|
-| Auth | Local password, mobile OTP, JWT cookies |
-| Validation | Zod |
-| Build | Vite + esbuild |
-| Testing/Checks | TypeScript build check, Vitest config present |
-| Infrastructure | Docker Compose, Nginx, Node 22-slim, PostgreSQL 15-alpine |
+| Layer          | Technology                                                   |
+| -------------- | ------------------------------------------------------------ |
+| Frontend       | React 19, TypeScript, Vite                                   |
+| Routing        | React Router                                                 |
+| Styling        | Tailwind CSS, shadcn/ui-style components, lucide-react icons |
+| Data Fetching  | tRPC React + TanStack Query                                  |
+| Backend        | Hono, tRPC 11                                                |
+| Database       | PostgreSQL (Neon) with Drizzle ORM                           |
+| Auth           | Local password, mobile OTP, JWT cookies                      |
+| Validation     | Zod                                                          |
+| Build          | Vite + esbuild                                               |
+| Testing/Checks | TypeScript build check, Vitest config present                |
+| Infrastructure | Docker Compose, Nginx, Node 22-slim, PostgreSQL 15-alpine    |
 
 ## Docker & Nginx Infrastructure
 
@@ -257,6 +265,16 @@ Hono/tRPC
     ↓
 PostgreSQL
 ```
+
+### Email Notification System
+
+The application implements a resilient email notification architecture for new orders:
+
+- **Provider:** Sends transactional emails via the Resend API (preferred) or falls back to standard SMTP via `nodemailer`.
+- **Formats:** Delivers dual-format emails (styled HTML for email clients, plain text for fallbacks).
+- **Triggers:** Automatically notifies the configured business owner/admin upon successful order creation.
+- **Data Source:** Pulls order details, pricing summaries, and customer information directly from the persisted order and order_items tables.
+- **Isolation:** Email delivery failures are caught and isolated; they do not cause order creation or the checkout transaction to fail.
 
 ### Razorpay Payment Flow
 
@@ -313,6 +331,8 @@ The payment flow has been production-hardened with the following features:
 - Buyer-safe product catalog actions.
 - Image fallback placeholders.
 - Documentation single source of truth.
+- Admin/business profile addresses (authoritative source).
+- Email notifications for new orders.
 
 ## Known Limitations
 
@@ -331,7 +351,7 @@ Planned evolution:
 - Add durable object storage for product media.
 - Add role and permission tables for manager, warehouse staff, sales executive, and platform admin.
 - Introduce tenant-aware middleware that scopes every query by active company/tenant.
-- Implement invoice, delivery, customer, warehouse, and notification modules.
+- Implement invoice, delivery, customer, and warehouse modules.
 
 - Add import/export and bulk edit jobs.
 - Add reporting aggregates and scheduled analytics snapshots.
