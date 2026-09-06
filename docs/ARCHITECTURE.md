@@ -1,6 +1,10 @@
-# AM Fruits (FreshFlow) Architecture
+# Architecture
 
-*Note: FreshFlow is the internal project/platform name; AM Fruits is the current public business/product brand.*
+This document defines the technical architecture of the application.
+
+### 1. Project identity
+
+The application's public branding is **AM Fruits** (visible to buyers/customers). Internal source folders, database tables, API namespaces, and legacy documentation may still use the internal identifier **FreshFlow**. This dual-naming convention is architectural and should be preserved.
 
 ## Project Overview
 
@@ -72,22 +76,23 @@ Backend query functions live in `api/queries/` and keep database access separate
 Current Drizzle tables:
 
 - `users`: authenticated users, local/mobile auth fields, role, company association, profile fields.
-- `otp_verifications`: mobile OTP challenge records.
+- `otpVerifications`: mobile OTP challenge records.
+- `userAddresses`: The definitive source of truth for user and platform admin/business addresses.
 - `companies`: buyer, supplier, or both company records.
 - `customers`: customer management records.
 - `categories`: product taxonomy with active/inactive and sort ordering.
 - `products`: wholesale catalog items, pricing, images, status, grade, and supplier ownership.
-- `cart_items`: user-scoped cart rows.
+- `cartItems`: user-scoped cart rows.
 - `orders`: purchase order header, parties, totals, status, shipping, payment, and timestamps.
-- `order_items`: line-item snapshots for orders.
+- `orderItems`: line-item snapshots for orders.
 - `invoices`: invoice headers.
-- `invoice_items`: invoice line items.
+- `invoiceItems`: invoice line items.
 - `inventory`: stock quantity, reserve, availability, reorder status, warehouse, and batch tracking.
 - `warehouses`: warehouse management records.
-- `warehouse_stock_movements`: history of stock movements.
-- `delivery_zones`: geographical delivery zones for shipping rules.
-- `gst_configurations`: tax configurations.
-- `shipping_methods`: available shipping methods.
+- `warehouseStockMovements`: history of stock movements.
+- `deliveryZones`: geographical delivery zones for shipping rules.
+- `gstConfigurations`: tax configurations.
+- `shippingMethods`: available shipping methods.
 
 Important relationships:
 
@@ -119,6 +124,7 @@ Important relationships:
 - `deliveryZone`: delivery zone configurations.
 - `gst`: GST settings.
 - `shipping`: shipping method management.
+- `address`: user address management.
 - `ping`: health check.
 
 Procedure types:
@@ -171,6 +177,11 @@ Buyer workflow:
 3. Sign in when adding products to cart, checking out, viewing orders, or entering the dashboard.
 4. Checkout converts cart items to a purchase order.
 5. Track purchase orders, invoices, and delivery status from buyer workspace pages.
+
+## Admin/Business Profile
+
+The Platform Admin profile/business address architecture ensures that the buyer's Order Detail page shows accurate, historically stable data.
+The live authoritative source for the admin/business address is the `userAddresses` table (not the legacy `companies` fields). If an explicit business address isn't found in `userAddresses`, the system falls back to `companies` fields, and finally to hardcoded placeholders in the order query. Crucially, order records store a complete, immutable snapshot of the relevant business and shipping addresses upon order creation so that future profile changes do not alter historical order details.
 
 ## Business Owner Workspace
 
@@ -258,14 +269,16 @@ Hono/tRPC
 PostgreSQL
 ```
 
-### Razorpay Payment Flow
+### Orders and Payment Flow
+
+Order creation strictly follows payment verification or explicit offline selection.
 
 ```text
 Buyer
  ↓
 Checkout
  ↓
-Backend creates Razorpay order
+Backend creates Razorpay order (or selects COD)
  ↓
 Razorpay Checkout
  ↓
@@ -273,7 +286,7 @@ Payment
  ↓
 Frontend receives Razorpay response
  ↓
-Backend verifies payment signature
+Backend verifies payment signature (HMAC-SHA256)
  ↓
 Order creation
  ↓
@@ -287,9 +300,13 @@ The payment flow has been production-hardened with the following features:
 - **Razorpay Signature Verification:** Verifies the payment locally on the backend using the server-side Razorpay secret.
 - **HMAC-SHA256:** Cryptographically hashes the payment payload.
 - **Timing-safe Signature Comparison:** Uses `crypto.timingSafeEqual` to prevent timing attacks during signature validation.
-- **Duplicate Payment/Order Protection (Idempotency):** Uses the `razorpayOrderId` to ensure multiple callbacks do not result in duplicate application orders.
-- **Frontend Payment-in-progress State:** Prevents repeated checkout submissions by disabling checkout buttons while the Razorpay modal is open.
+- **Duplicate Payment/Order Protection (Idempotency):** Order creation mutations query the database for existing `razorpayOrderId`s before creating new records to prevent duplicate orders.
+- **Frontend Payment-in-progress State:** The frontend checkout UI utilizes an `isPaymentInProgress` state to disable the checkout button while the Razorpay modal is active, preventing repeated checkout submissions and duplicate orders.
 - **Failed/Cancelled Payment Handling:** Gracefully captures errors and failed states from the Razorpay modal.
+
+### Email / Notification Architecture
+
+The backend implements an email notification system to send alerts to admins upon successful order creation. It uses the Resend API with an SMTP fallback via `nodemailer`. This system is designed to fail gracefully—email delivery failure is isolated and will *not* break the successful persistence of the order in the database.
 
 ## Current Features
 
