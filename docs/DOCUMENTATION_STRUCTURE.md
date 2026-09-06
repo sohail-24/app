@@ -150,6 +150,12 @@ Defines the official documentation standard used throughout the project.
 
 ---
 
+## PRODUCTION_READINESS.md
+
+Defines the production deployment architecture and checklist.
+
+---
+
 # Database Documentation
 
 ```text
@@ -208,7 +214,7 @@ checkout/
 home-marketplace/
 orders/
 owner-dashboard/
-product-catalog/
+product-details/
 ```
 
 UI pages define screen layout, navigation, user interactions, and user experience.
