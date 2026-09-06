@@ -1,4 +1,5 @@
 import { getDb } from "./connection";
+import { findAddressesByUserId } from "./addresses";
 import {
   cartItems,
   companies,
@@ -6,11 +7,11 @@ import {
   orderItems,
   orders,
   users,
-  warehouses,
   type InsertOrder,
   type InsertOrderItem,
 } from "@db/schema";
 import { and, desc, eq, ilike, or, sql } from "drizzle-orm";
+import { BUSINESS_OWNER_EMAIL } from "@contracts/roles";
 
 export type OrderStatus = NonNullable<InsertOrder["status"]>;
 export type DeliveryEstimate = NonNullable<InsertOrder["deliveryEstimate"]>;
@@ -179,15 +180,16 @@ export async function findOrderById(orderId: number) {
 
   if (!order) return null;
 
-  const [buyer, supplier, supplierAdmin, platformAdmin, buyerUser, activeWarehouse] = await Promise.all([
+  const [buyer, supplier, supplierAdmin, platformAdmin, buyerUser] = await Promise.all([
     db.query.companies.findFirst({ where: eq(companies.id, order.buyerId) }),
     db.query.companies.findFirst({ where: eq(companies.id, order.supplierId) }),
     db.query.users.findFirst({
       where: and(eq(users.companyId, order.supplierId), eq(users.role, "admin")),
     }),
-    db.query.users.findFirst({ where: eq(users.role, "admin") }),
+    db.query.users.findFirst({
+      where: or(eq(users.email, BUSINESS_OWNER_EMAIL), eq(users.role, "admin")),
+    }),
     db.query.users.findFirst({ where: eq(users.id, order.placedByUserId) }),
-    db.query.warehouses.findFirst({ where: eq(warehouses.status, "active") }),
   ]);
 
   // Determine if supplier is the store owner / AM Fruits or placeholder seed company
@@ -202,42 +204,46 @@ export async function findOrderById(orderId: number) {
     supplier.country === "USA" ||
     Boolean(supplier.addressLine1?.includes("Fruit Ave"));
 
+  // Retrieve the platform admin's live addresses from userAddresses (same authoritative source as Admin Profile)
+  const adminAddresses = platformAdmin ? await findAddressesByUserId(platformAdmin.id) : [];
+  const adminDefaultAddress = adminAddresses.find((a) => a.isDefault) || adminAddresses[0] || null;
+
   const businessAccount = isOwnerOrPlaceholder ? platformAdmin : (supplierAdmin ?? platformAdmin);
   const businessName = isOwnerOrPlaceholder
-    ? (businessAccount?.name || activeWarehouse?.name || "AM Fruits")
+    ? (businessAccount?.name || "AM Fruits")
     : (supplierAdmin?.name || supplier?.name || businessAccount?.name || "AM Fruits");
 
   const businessPhone = isOwnerOrPlaceholder
-    ? (businessAccount?.phone || activeWarehouse?.contactNumber || null)
+    ? (businessAccount?.phone || null)
     : (supplierAdmin?.phone || supplier?.phone || businessAccount?.phone || null);
 
   const businessEmail = isOwnerOrPlaceholder
-    ? (businessAccount?.email || null)
-    : (supplierAdmin?.email || supplier?.email || businessAccount?.email || null);
+    ? (businessAccount?.email || BUSINESS_OWNER_EMAIL)
+    : (supplierAdmin?.email || supplier?.email || businessAccount?.email || BUSINESS_OWNER_EMAIL);
 
   const businessAddressLine1 = isOwnerOrPlaceholder
-    ? (businessAccount?.addressLine1 || activeWarehouse?.address || null)
-    : (supplierAdmin?.addressLine1 || supplier?.addressLine1 || businessAccount?.addressLine1 || null);
+    ? (adminDefaultAddress?.addressLine1 || null)
+    : (supplierAdmin?.addressLine1 || (supplier?.country !== "USA" ? supplier?.addressLine1 : null) || adminDefaultAddress?.addressLine1 || null);
 
   const businessAddressLine2 = isOwnerOrPlaceholder
-    ? (businessAccount?.addressLine2 || null)
-    : (supplierAdmin?.addressLine2 || supplier?.addressLine2 || null);
+    ? ([adminDefaultAddress?.addressLine2, adminDefaultAddress?.landmark, adminDefaultAddress?.areaLocality].filter(Boolean).join(", ") || null)
+    : (supplierAdmin?.addressLine2 || (supplier?.country !== "USA" ? supplier?.addressLine2 : null) || [adminDefaultAddress?.addressLine2, adminDefaultAddress?.landmark, adminDefaultAddress?.areaLocality].filter(Boolean).join(", ") || null);
 
   const businessCity = isOwnerOrPlaceholder
-    ? (businessAccount?.city || activeWarehouse?.city || null)
-    : (supplierAdmin?.city || supplier?.city || businessAccount?.city || null);
+    ? (adminDefaultAddress?.city || null)
+    : (supplierAdmin?.city || (supplier?.country !== "USA" ? supplier?.city : null) || adminDefaultAddress?.city || null);
 
   const businessState = isOwnerOrPlaceholder
-    ? (businessAccount?.state || activeWarehouse?.state || null)
-    : (supplierAdmin?.state || (supplier?.country !== "USA" ? supplier?.state : null) || activeWarehouse?.state || null);
+    ? (adminDefaultAddress?.state || null)
+    : (supplierAdmin?.state || (supplier?.country !== "USA" ? supplier?.state : null) || adminDefaultAddress?.state || null);
 
   const businessPostalCode = isOwnerOrPlaceholder
-    ? (businessAccount?.postalCode || activeWarehouse?.postalCode || null)
-    : (supplierAdmin?.postalCode || (supplier?.country !== "USA" ? supplier?.postalCode : null) || businessAccount?.postalCode || null);
+    ? (adminDefaultAddress?.postalCode || null)
+    : (supplierAdmin?.postalCode || (supplier?.country !== "USA" ? supplier?.postalCode : null) || adminDefaultAddress?.postalCode || null);
 
   const businessCountry = isOwnerOrPlaceholder
-    ? (businessAccount?.country || activeWarehouse?.country || "India")
-    : (supplierAdmin?.country || (supplier?.country !== "USA" ? supplier?.country : null) || businessAccount?.country || "India");
+    ? (adminDefaultAddress?.country || null)
+    : (supplierAdmin?.country || (supplier?.country !== "USA" ? supplier?.country : null) || adminDefaultAddress?.country || null);
 
   return {
     ...order,

@@ -216,9 +216,6 @@ export default function OrderDetail() {
                 </>
               ) : (
                 <>
-                  <ReadOnly label="Business Name" value={order.supplierName} />
-                  <ReadOnly label="Phone / Contact" value={order.supplierPhone} />
-                  {order.supplierEmail && <ReadOnly label="Email" value={order.supplierEmail} />}
                   <ReadOnly
                     label="Address"
                     value={[order.supplierAddressLine1, order.supplierAddressLine2].filter(Boolean).join(", ") || null}
