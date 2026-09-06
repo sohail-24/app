@@ -214,7 +214,7 @@ export async function findOrderById(orderId: number) {
     : (supplierAdmin?.name || supplier?.name || businessAccount?.name || "AM Fruits");
 
   const businessPhone = isOwnerOrPlaceholder
-    ? (businessAccount?.phone || null)
+    ? (adminDefaultAddress?.mobileNumber || businessAccount?.phone || null)
     : (supplierAdmin?.phone || supplier?.phone || businessAccount?.phone || null);
 
   const businessEmail = isOwnerOrPlaceholder
