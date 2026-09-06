@@ -1,19 +1,30 @@
-# ---- Build Stage ----
-FROM node:22-slim AS builder
+# ---- Dependencies Stage ----
+FROM oven/bun:1-slim AS deps
 
 WORKDIR /app
 
-# Copy package files
-COPY package.json package-lock.json ./
+# Copy package manifest and Bun lockfile
+COPY package.json bun.lock ./
+
+# Install production dependencies deterministically from bun.lock
+RUN bun install --production --frozen-lockfile
+
+# ---- Build Stage ----
+FROM oven/bun:1-slim AS builder
+
+WORKDIR /app
+
+# Copy package manifest and Bun lockfile
+COPY package.json bun.lock ./
 
 # Install all dependencies (including devDependencies required for building)
-RUN npm ci
+RUN bun install --frozen-lockfile
 
 # Copy the rest of the application
 COPY . .
 
-# Build the application
-RUN npm run build
+# Build the application (Vite SPA + ESBuild backend bundle)
+RUN bun run build
 
 # ---- Production Stage (Backend) ----
 FROM node:22-slim AS production
@@ -23,11 +34,11 @@ WORKDIR /app
 # Set environment to production
 ENV NODE_ENV=production
 
-# Copy package files
-COPY package.json package-lock.json ./
+# Copy package manifest
+COPY package.json ./
 
-# Install only production dependencies
-RUN npm ci --omit=dev
+# Copy production dependencies from deps stage
+COPY --from=deps /app/node_modules ./node_modules
 
 # Copy built backend code from builder stage
 COPY --from=builder /app/dist/boot.js ./dist/boot.js
