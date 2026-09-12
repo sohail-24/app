@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
-import { useTheme } from "next-themes";
+import { useTheme } from "@/providers/theme";
 import { trpc } from "@/providers/trpc";
 import { getAppRole, getRoleLabel } from "@/lib/roles";
 import { formatDate } from "@/lib/i18n";

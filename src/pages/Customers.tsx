@@ -136,7 +136,7 @@ export default function Customers() {
   );
   const companiesQuery = trpc.company.list.useQuery(undefined, { retry: false });
 
-  const customers = customersQuery.data?.items ?? [];
+  const customers = useMemo(() => customersQuery.data?.items ?? [], [customersQuery.data?.items]);
   const selected = detailQuery.data ?? null;
   const buyers = (companiesQuery.data ?? []).filter((company) => company.type === "buyer" || company.type === "both");
 

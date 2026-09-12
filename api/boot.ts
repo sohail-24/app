@@ -141,7 +141,7 @@ if (env.isProduction) {
     console.warn("Database migrations skipped or failed — running with in-memory database:", error?.message);
   }
 
-  const port = parseInt(process.env.PORT || "3000");
+  const port = 3000;
   const server = serve({ fetch: app.fetch, port, hostname: "0.0.0.0" }, () => {
     console.log(`Server running on http://localhost:${port}/`);
   });

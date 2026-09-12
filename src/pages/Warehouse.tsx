@@ -141,7 +141,7 @@ export default function Warehouse() {
   );
 
   const warehouse = warehouseQuery.data ?? null;
-  const stock = stockQuery.data ?? [];
+  const stock = useMemo(() => stockQuery.data ?? [], [stockQuery.data]);
   const movements = movementsQuery.data ?? [];
   const warehouseList = warehouseListQuery.data ?? [];
   const warehouseMissing = warehouseQuery.error?.data?.code === "NOT_FOUND";

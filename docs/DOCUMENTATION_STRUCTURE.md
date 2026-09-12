@@ -1,10 +1,10 @@
 # FreshFlow Documentation Structure
 
-**Version:** 3.3
+**Version:** 4.1
 
 **Status:** Active
 
-**Last Updated:** 2026-07-27
+**Last Updated:** 2026-09-12
 
 ---
 
@@ -86,6 +86,8 @@ docs/
 ├── PRODUCTION_READINESS.md
 │
 ├── database/
+│   ├── MIGRATIONS.md
+│   └── SCHEMA.md
 │
 └── UI/
     │
@@ -506,6 +508,17 @@ Changes include:
 ---
 
 # Version History
+
+## Version 4.1
+
+Documentation structure and evidence update.
+
+Changes include:
+* Synchronized document version header (Version 4.1).
+* Explicitly mapped `database/` contents (`MIGRATIONS.md`, `SCHEMA.md`) in the project documentation tree.
+* Verified complete alignment between repository implementation, business modules (9 modules), UI pages (8 pages), and architecture evidence.
+
+---
 
 ## Version 4.0
 

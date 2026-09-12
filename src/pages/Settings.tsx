@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
-import { useTheme } from "next-themes";
+import { useTheme } from "@/providers/theme";
 import { useAuth } from "@/hooks/useAuth";
 import { DEFAULT_CURRENCY } from "@/lib/i18n";
 import { getAppRole, getRoleLabel } from "@/lib/roles";

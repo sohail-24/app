@@ -357,7 +357,7 @@ function ProductCard({ product, onAdd, pending }: { product: CatalogProduct; onA
 function OwnerProductCatalog() {
   const [search, setSearch] = useState("");
   const productsQuery = trpc.product.list.useQuery({ search: search || undefined, sortBy: "newest" }, { retry: false });
-  const products = productsQuery.data ?? [];
+  const products = useMemo(() => productsQuery.data ?? [], [productsQuery.data]);
   const stats = useMemo(() => ({
     active: products.filter((product) => product.status === "active").length,
     categories: new Set(products.map((product) => product.categoryId)).size,

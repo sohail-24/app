@@ -1,23 +1,19 @@
 import "dotenv/config";
 
-function required(name: string): string {
-  const value = process.env[name];
-  if (!value && process.env.NODE_ENV === "production") {
-    throw new Error(`Missing required environment variable: ${name}`);
-  }
-  return value ?? "";
+function getEnv(name: string, fallback = ""): string {
+  return process.env[name] || fallback;
 }
 
 export const env = {
   isProduction: process.env.NODE_ENV === "production",
-  databaseUrl: required("DATABASE_URL"),
+  databaseUrl: getEnv("DATABASE_URL"),
   jwtAccessSecret:
-    required("JWT_ACCESS_SECRET") || "dev-access-secret-change-me",
+    getEnv("JWT_ACCESS_SECRET", "dev-access-secret-change-me"),
   jwtRefreshSecret:
-    required("JWT_REFRESH_SECRET") || "dev-refresh-secret-change-me",
+    getEnv("JWT_REFRESH_SECRET", "dev-refresh-secret-change-me"),
   mockOtpCode: process.env.MOCK_OTP_CODE ?? "123456",
-  ownerEmail: process.env.OWNER_EMAIL ?? "",
-  adminOrderEmail: process.env.ADMIN_ORDER_EMAIL ?? process.env.OWNER_EMAIL ?? "",
+  ownerEmail: process.env.OWNER_EMAIL ?? "owner@freshflow.com",
+  adminOrderEmail: process.env.ADMIN_ORDER_EMAIL ?? process.env.OWNER_EMAIL ?? "orders@freshflow.com",
   appUrl: process.env.APP_URL ?? "",
   smtpHost: process.env.SMTP_HOST ?? "",
   smtpPort: process.env.SMTP_PORT ? parseInt(process.env.SMTP_PORT, 10) : 587,

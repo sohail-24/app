@@ -63,7 +63,7 @@ export default function Categories() {
   const [dialogOpen, setDialogOpen] = useState(false);
   const utils = trpc.useUtils();
   const categoriesQuery = trpc.category.list.useQuery({ includeInactive: true }, { retry: false });
-  const categories = categoriesQuery.data ?? [];
+  const categories = useMemo(() => categoriesQuery.data ?? [], [categoriesQuery.data]);
   const activeCategories = categories.filter((category) => category.isActive);
   const createCategory = trpc.category.create.useMutation({
     onSuccess: async () => {

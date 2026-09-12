@@ -181,7 +181,7 @@ export default function Inventory() {
     onError: (error) => toast.error(error.message || "Could not delete inventory."),
   });
 
-  const inventory = inventoryQuery.data ?? [];
+  const inventory = useMemo(() => inventoryQuery.data ?? [], [inventoryQuery.data]);
   const selected = inventory.find((item) => item.id === selectedId) ?? null;
   const marketplaceQuery = trpc.product.marketplaceById.useQuery(
     { id: selected?.productId ?? 0 },

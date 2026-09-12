@@ -62,7 +62,7 @@ import {
   Users,
   Warehouse,
 } from "lucide-react";
-import { useTheme } from "next-themes";
+import { useTheme } from "@/providers/theme";
 import { type ElementType } from "react";
 import { Link, Outlet, useLocation, useNavigate } from "react-router";
 
